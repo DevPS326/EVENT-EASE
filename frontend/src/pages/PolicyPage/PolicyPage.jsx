@@ -1,0 +1,39 @@
+﻿import React from 'react';
+
+const PolicyPage = () => {
+    return (
+        <div className={styles.container}>
+            <h1 className={styles.title}>Refund & Cancellation Policy</h1>
+
+            <section className={styles.section}>
+                <h2 className={styles.sectionTitle}>1. Ticket Purchase and Refunds</h2>
+                <p>All ticket sales are final. Refunds will only be issued in the following circumstances:</p>
+                <ul>
+                    <li><strong>Event Cancellation:</strong> If an event is cancelled in its entirety, ticket holders will be offered a full refund.</li>
+                    <li><strong>Significant Event Change:</strong> If there is a significant change to the event (e.g., date, venue, headliner), ticket holders may be offered a refund option.</li>
+                </ul>
+                <p>Refund requests for cancelled or significantly changed events must be submitted within [X] days of the announcement of cancellation or change.</p>
+            </section>
+
+            <section className={styles.section}>
+                <h2 className={styles.sectionTitle}>2. Ticket Cancellations by User</h2>
+                <p>Users may cancel their tickets for upcoming events up to [Y] days before the event date. A cancellation fee of [Z]% of the ticket price may apply.</p>
+                <p>To cancel a ticket, please navigate to your User Dashboard, locate the upcoming event, and select the cancellation option. Refunds for user-initiated cancellations will be processed within [W] business days.</p>
+                <p>No cancellations or refunds will be issued for requests made less than [Y] days before the event.</p>
+            </section>
+
+            <section className={styles.section}>
+                <h2 className={styles.sectionTitle}>3. Processing Refunds</h2>
+                <p>Refunds will be processed to the original method of payment. Please allow [V] business days for the refund to appear on your statement.</p>
+            </section>
+
+            <section className={styles.section}>
+                <h2 className={styles.sectionTitle}>4. Contact Us</h2>
+                <p>For any questions regarding our refund and cancellation policy, please contact our support team at <a href="mailto:support@eventease.com">support@eventease.com</a>.</p>
+            </section>
+        </div>
+    );
+};
+
+export default PolicyPage;
+
