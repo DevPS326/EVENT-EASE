@@ -1,6 +1,7 @@
 // backend/controllers/authController.js
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const axios = require('axios');
 const { sendEmail } = require('../utils/emailService');
 
@@ -88,10 +89,13 @@ exports.login = async (req, res) => {
                 const twoFACode = Math.floor(100000 + Math.random() * 900000).toString();
                 const twoFACodeExpires = Date.now() + 10 * 60 * 1000; // 10 mins
 
-                user.twoFACode = twoFACode;
+                // SECURITY: store a bcrypt hash, never the plaintext code.
+                // If the DB is compromised, active 2FA sessions cannot be exploited.
+                user.twoFACode = await bcrypt.hash(twoFACode, 10);
                 user.twoFACodeExpires = twoFACodeExpires;
                 await user.save();
 
+                // Send the plaintext code to the user's email (never stored)
                 await sendEmail(
                     user.email,
                     'Your 2FA Code for EventEase',
@@ -127,7 +131,13 @@ exports.verify2FA = async (req, res) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        if (user.twoFACode !== twoFACode || user.twoFACodeExpires < Date.now()) {
+        // Compare submitted code against the stored bcrypt hash.
+        // bcrypt.compare is constant-time, preventing timing-based enumeration.
+        const isCodeValid = user.twoFACode
+            ? await bcrypt.compare(twoFACode, user.twoFACode)
+            : false;
+
+        if (!isCodeValid || user.twoFACodeExpires < Date.now()) {
             return res.status(400).json({ message: 'Invalid or expired 2FA code' });
         }
 

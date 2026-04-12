@@ -61,6 +61,82 @@ exports.createOrder = async (req, res) => {
   }
 };
 
+// @desc    Razorpay server-to-server webhook handler
+// @route   POST /api/payments/webhook
+// @access  Public — authenticated via HMAC, NOT JWT
+//
+// This is a safety-net handler. Razorpay calls this endpoint directly when a
+// payment event fires on their end (e.g., browser crash after payment, network
+// failure before verifyPayment completes). HMAC is verified over the raw body
+// bytes captured by the express.json verify callback in index.js.
+exports.handleWebhook = async (req, res) => {
+  const signature = req.headers['x-razorpay-signature'];
+
+  if (!signature) {
+    return res.status(400).json({ success: false, message: 'Missing x-razorpay-signature header' });
+  }
+
+  const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    console.error('RAZORPAY_WEBHOOK_SECRET env var is not set');
+    return res.status(500).json({ success: false, message: 'Webhook secret not configured' });
+  }
+
+  // Raw body buffer was captured by the express.json verify callback.
+  // HMAC must be computed over the exact bytes received — not a re-stringified parse.
+  const rawBody = req.rawBody;
+  if (!rawBody) {
+    return res.status(400).json({ success: false, message: 'Raw body unavailable for verification' });
+  }
+
+  const expectedSignature = crypto
+    .createHmac('sha256', webhookSecret)
+    .update(rawBody)
+    .digest('hex');
+
+  if (expectedSignature !== signature) {
+    console.warn('Razorpay webhook: signature mismatch — possible spoofing attempt');
+    return res.status(400).json({ success: false, message: 'Invalid webhook signature' });
+  }
+
+  // Signature verified — safe to process the event payload
+  const eventType = req.body && req.body.event;
+
+  try {
+    if (eventType === 'payment.captured') {
+      const paymentEntity = req.body.payload.payment.entity;
+      const orderId = paymentEntity.order_id;
+      const paymentId = paymentEntity.id;
+
+      // Idempotency: if verifyPayment already created this record, skip
+      const existing = await Payment.findOne({ orderId });
+      if (!existing) {
+        // Fallback: record the captured payment so reconciliation jobs can
+        // detect orders that completed on Razorpay but whose verifyPayment
+        // call never arrived (browser crash, network drop, etc.)
+        await Payment.create({
+          orderId,
+          paymentId,
+          signature: signature,
+          status: 'success',
+          // user/event unknown at this point — reconciliation job fills them in
+          user: new mongoose.Types.ObjectId(),
+          event: new mongoose.Types.ObjectId(),
+          amount: paymentEntity.amount / 100, // paise → INR
+        });
+      }
+    }
+
+    // Always ACK with 200 — Razorpay retries on any non-2xx response
+    return res.status(200).json({ success: true });
+
+  } catch (err) {
+    console.error('Webhook processing error:', err);
+    // Return 200 to prevent Razorpay from flooding with retries on transient errors
+    return res.status(200).json({ success: true });
+  }
+};
+
 // @desc    Verify payment and create tickets
 // @route   POST /api/payments/verify
 // @access  Private

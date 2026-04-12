@@ -19,7 +19,14 @@ startScheduler();
 const app = express();
 
 // Use Middlewares
-app.use(express.json()); // To parse JSON data
+// Capture the raw request body bytes before JSON parsing.
+// Required for Razorpay webhook HMAC verification — re-stringifying the
+// parsed body is NOT byte-safe (key ordering may differ) and would fail.
+app.use(express.json({
+  verify: (req, _res, buf) => {
+    req.rawBody = buf;
+  },
+}));
 app.use(cors()); // To enable Cross-Origin Resource Sharing
 app.use(passport.initialize()); // Initialize Passport
 
