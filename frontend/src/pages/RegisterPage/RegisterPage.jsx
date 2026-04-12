@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import client from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 
 const RegisterPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -45,7 +46,8 @@ const RegisterPage = () => {
       const res = await client.post('/api/auth/signup', payload);
       login(res.data);
       toast.success('Account created! Welcome to EventEase.');
-      navigate('/dashboard');
+      const destination = location.state?.from?.pathname || '/dashboard';
+      navigate(destination, { replace: true });
     } catch (err) {
       toast.error(err.response?.data?.message || 'Registration failed. Please try again.');
     } finally {

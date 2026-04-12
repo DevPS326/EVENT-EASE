@@ -54,7 +54,9 @@ const LoginPage = () => {
 
       login(res.data);
       toast.success('Welcome back!');
-      navigate('/dashboard');
+      // Redirect to the page the user originally tried to access, or dashboard
+      const destination = location.state?.from?.pathname || '/dashboard';
+      navigate(destination, { replace: true });
     } catch (err) {
       toast.error(err.response?.data?.message || 'Login failed. Please try again.');
     } finally {
