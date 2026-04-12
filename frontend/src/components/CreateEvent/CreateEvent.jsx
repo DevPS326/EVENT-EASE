@@ -1,104 +1,86 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useForm, useFieldArray } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import toast from 'react-hot-toast';
 import client from '../../api/client';
 
+// ── Zod Schema ─────────────────────────────────────────────────────────────────
+const ticketTierSchema = z.object({
+  name:     z.string().min(1, 'Tier name is required'),
+  price:    z.coerce.number({ invalid_type_error: 'Must be a number' }).min(0, 'Price must be ≥ 0'),
+  quantity: z.coerce.number({ invalid_type_error: 'Must be a number' }).int('Must be a whole number').min(1, 'Capacity must be ≥ 1'),
+});
+
 const CATEGORIES = ['Music', 'Tech', 'Workshop', 'Business', 'Art', 'Sports', 'Food'];
 
-const defaultTier = () => ({ name: '', price: '', quantity: '' });
+const createEventSchema = z.object({
+  title:       z.string().min(3, 'Title must be at least 3 characters'),
+  description: z.string().min(10, 'Description must be at least 10 characters'),
+  date:        z
+    .string()
+    .min(1, 'Date is required')
+    .refine((d) => new Date(d) > new Date(), 'Event date must be in the future'),
+  venue:       z.string().min(3, 'Venue must be at least 3 characters'),
+  category:    z.enum(CATEGORIES, { errorMap: () => ({ message: 'Select a category' }) }),
+  imageUrl:    z.string().url('Must be a valid URL (include https://)'),
+  ticketTypes: z
+    .array(ticketTierSchema)
+    .min(1, 'Add at least one ticket tier'),
+});
 
+// ── Component ──────────────────────────────────────────────────────────────────
 const CreateEvent = () => {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
 
-  const [formData, setFormData] = useState({
-    title:       '',
-    description: '',
-    date:        '',
-    venue:       '',
-    category:    'Music',
-    imageUrl:    '',
+  const {
+    register,
+    handleSubmit,
+    control,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver:      zodResolver(createEventSchema),
+    defaultValues: {
+      title:       '',
+      description: '',
+      date:        '',
+      venue:       '',
+      category:    'Music',
+      imageUrl:    '',
+      ticketTypes: [{ name: 'General Admission', price: '', quantity: '' }],
+    },
   });
 
-  // Dynamic ticket-tier array — each tier: { name, price, quantity }
-  const [ticketTypes, setTicketTypes] = useState([
-    { name: 'General Admission', price: '', quantity: '' },
-  ]);
+  // Dynamic ticket tier array
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'ticketTypes',
+  });
 
-  const [errors, setErrors] = useState({});
+  const imageUrlValue = watch('imageUrl');
 
-  // ── Field handlers ───────────────────────────────────────────────────────────
-  const handleChange = (e) =>
-    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-
-  const handleTierChange = (index, e) => {
-    setTicketTypes((prev) => {
-      const next = [...prev];
-      next[index] = { ...next[index], [e.target.name]: e.target.value };
-      return next;
-    });
-  };
-
-  const addTier    = () => setTicketTypes((prev) => [...prev, defaultTier()]);
-  const removeTier = (i) => setTicketTypes((prev) => prev.filter((_, idx) => idx !== i));
-
-  // ── Validation ───────────────────────────────────────────────────────────────
-  const validate = () => {
-    const errs = {};
-    if (!formData.title.trim())       errs.title       = 'Title is required';
-    if (!formData.description.trim()) errs.description = 'Description is required';
-    if (!formData.date)               errs.date        = 'Date is required';
-    else if (new Date(formData.date) < new Date()) errs.date = 'Date cannot be in the past';
-    if (!formData.venue.trim())       errs.venue       = 'Venue is required';
-    if (!formData.imageUrl.trim())    errs.imageUrl    = 'Image URL is required';
-
-    ticketTypes.forEach((t, i) => {
-      if (!t.name.trim())            errs[`tier_${i}_name`]     = 'Name required';
-      if (!t.price || Number(t.price) < 0) errs[`tier_${i}_price`] = 'Valid price required';
-      if (!t.quantity || Number(t.quantity) < 1) errs[`tier_${i}_quantity`] = 'Quantity ≥ 1';
-    });
-
-    return errs;
-  };
-
-  // ── Submit ───────────────────────────────────────────────────────────────────
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const errs = validate();
-    if (Object.keys(errs).length > 0) {
-      setErrors(errs);
-      toast.error('Please fix the highlighted errors before submitting.');
-      return;
-    }
-    setErrors({});
-    setLoading(true);
-
+  const onSubmit = async (data) => {
     try {
-      await client.post('/api/events/create', {
-        ...formData,
-        ticketTypes: ticketTypes.map((t) => ({
-          name:     t.name.trim(),
-          price:    Number(t.price),
-          quantity: Number(t.quantity),
-        })),
-      });
+      await client.post('/api/events/create', data);
       toast.success('Event published successfully!');
       navigate('/organizer/dashboard');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to create event. Please try again.');
-    } finally {
-      setLoading(false);
     }
   };
 
-  // ── Render helpers ───────────────────────────────────────────────────────────
-  const FieldError = ({ name }) =>
-    errors[name] ? (
-      <p className="text-red-400 text-xs mt-1">{errors[name]}</p>
-    ) : null;
+  // ── Shared input class helper ─────────────────────────────────────────────
+  const inputCls = (hasError) =>
+    `w-full bg-slate-950/50 border ${
+      hasError ? 'border-red-500/60 focus:ring-red-500' : 'border-slate-700 focus:ring-violet-500'
+    } text-white px-4 py-3 rounded-lg focus:ring-2 focus:border-transparent outline-none transition-all placeholder-slate-500 text-sm`;
 
-  const inputCls = (name) =>
-    `w-full bg-slate-950/50 border ${errors[name] ? 'border-red-500/60' : 'border-slate-700'} text-white px-4 py-3 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition-all placeholder-slate-500`;
+  const tierInputCls = (hasError) =>
+    `w-full bg-slate-900 border ${
+      hasError ? 'border-red-500/60 focus:ring-red-500' : 'border-slate-700 focus:ring-violet-500'
+    } text-white px-3 py-2.5 rounded-lg focus:ring-1 focus:border-transparent outline-none text-sm transition-all`;
 
   return (
     <div className="min-h-screen bg-slate-950 pt-24 pb-16 px-4 relative overflow-hidden">
@@ -113,120 +95,125 @@ const CreateEvent = () => {
         </div>
 
         <form
-          onSubmit={handleSubmit}
+          onSubmit={handleSubmit(onSubmit)}
           noValidate
           className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 md:p-8 shadow-2xl"
         >
 
-          {/* ── Section 1: Event Details ───────────────────────────────── */}
+          {/* ── Section 1: Event Details ──────────────────────────────── */}
           <fieldset className="space-y-5 mb-8">
-            <legend className="text-xl font-semibold text-white border-b border-slate-700 pb-2 w-full">
+            <legend className="text-xl font-semibold text-white border-b border-slate-700 pb-2 w-full mb-1">
               Event Details
             </legend>
 
             {/* Title */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">Event Title *</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                Event Title <span className="text-red-400">*</span>
+              </label>
               <input
                 type="text"
-                name="title"
-                value={formData.title}
-                onChange={handleChange}
                 placeholder="e.g. Neon Music Festival 2025"
-                className={inputCls('title')}
+                {...register('title')}
+                className={inputCls(!!errors.title)}
               />
-              <FieldError name="title" />
+              {errors.title && <p className="text-red-400 text-xs mt-1">{errors.title.message}</p>}
             </div>
 
             {/* Description */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">Description *</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                Description <span className="text-red-400">*</span>
+              </label>
               <textarea
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
                 rows={4}
                 placeholder="Tell attendees what makes your event special…"
-                className={`${inputCls('description')} resize-none`}
+                {...register('description')}
+                className={`${inputCls(!!errors.description)} resize-none`}
               />
-              <FieldError name="description" />
+              {errors.description && (
+                <p className="text-red-400 text-xs mt-1">{errors.description.message}</p>
+              )}
             </div>
 
             {/* Date + Category */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">Date & Time *</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                  Date &amp; Time <span className="text-red-400">*</span>
+                </label>
                 <input
                   type="datetime-local"
-                  name="date"
-                  value={formData.date}
-                  onChange={handleChange}
-                  className={`${inputCls('date')} [color-scheme:dark]`}
+                  {...register('date')}
+                  className={`${inputCls(!!errors.date)} [color-scheme:dark]`}
                 />
-                <FieldError name="date" />
+                {errors.date && <p className="text-red-400 text-xs mt-1">{errors.date.message}</p>}
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">Category *</label>
-                <select
-                  name="category"
-                  value={formData.category}
-                  onChange={handleChange}
-                  className={inputCls('category')}
-                >
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                  Category <span className="text-red-400">*</span>
+                </label>
+                <select {...register('category')} className={inputCls(!!errors.category)}>
+                  {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
+                {errors.category && <p className="text-red-400 text-xs mt-1">{errors.category.message}</p>}
               </div>
             </div>
 
             {/* Venue */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">Venue / Location *</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                Venue / Location <span className="text-red-400">*</span>
+              </label>
               <input
                 type="text"
-                name="venue"
-                value={formData.venue}
-                onChange={handleChange}
                 placeholder="e.g. Grand Convention Center, Mumbai"
-                className={inputCls('venue')}
+                {...register('venue')}
+                className={inputCls(!!errors.venue)}
               />
-              <FieldError name="venue" />
+              {errors.venue && <p className="text-red-400 text-xs mt-1">{errors.venue.message}</p>}
             </div>
 
             {/* Image URL */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">Banner Image URL *</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                Banner Image URL <span className="text-red-400">*</span>
+              </label>
               <input
                 type="url"
-                name="imageUrl"
-                value={formData.imageUrl}
-                onChange={handleChange}
                 placeholder="https://images.unsplash.com/…"
-                className={inputCls('imageUrl')}
+                {...register('imageUrl')}
+                className={inputCls(!!errors.imageUrl)}
               />
-              <FieldError name="imageUrl" />
-              <p className="text-xs text-slate-500 mt-1">
-                Use a high-quality landscape image (Unsplash, Imgur, etc.)
-              </p>
-              {formData.imageUrl && !errors.imageUrl && (
+              {errors.imageUrl ? (
+                <p className="text-red-400 text-xs mt-1">{errors.imageUrl.message}</p>
+              ) : (
+                <p className="text-xs text-slate-500 mt-1">
+                  Use a high-quality landscape image (Unsplash, Imgur, Cloudinary, etc.)
+                </p>
+              )}
+              {/* Live preview */}
+              {imageUrlValue && !errors.imageUrl && (
                 <img
-                  src={formData.imageUrl}
-                  alt="Preview"
+                  src={imageUrlValue}
+                  alt="Banner preview"
                   className="mt-3 h-32 w-full object-cover rounded-lg border border-slate-700"
                   onError={(e) => { e.target.style.display = 'none'; }}
+                  onLoad={(e)  => { e.target.style.display = 'block'; }}
                 />
               )}
             </div>
           </fieldset>
 
-          {/* ── Section 2: Ticket Tiers ────────────────────────────────── */}
+          {/* ── Section 2: Ticket Tiers (useFieldArray) ───────────────── */}
           <fieldset className="space-y-4 mb-8">
             <div className="flex justify-between items-center border-b border-slate-700 pb-2">
-              <legend className="text-xl font-semibold text-white">Ticket Tiers *</legend>
+              <legend className="text-xl font-semibold text-white">
+                Ticket Tiers <span className="text-red-400">*</span>
+              </legend>
               <button
                 type="button"
-                onClick={addTier}
+                onClick={() => append({ name: '', price: '', quantity: '' })}
                 className="text-violet-400 hover:text-violet-300 text-sm font-semibold transition-colors flex items-center gap-1"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -236,93 +223,100 @@ const CreateEvent = () => {
               </button>
             </div>
 
-            {ticketTypes.map((tier, index) => (
-              <div
-                key={index}
-                className="bg-slate-950/40 border border-slate-800 hover:border-slate-700 rounded-xl p-4 relative group transition-colors"
-              >
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Tier name */}
-                  <div className="md:col-span-1">
-                    <label className="block text-xs text-slate-400 mb-1 font-medium">
-                      Tier Name *
-                    </label>
-                    <input
-                      type="text"
-                      name="name"
-                      value={tier.name}
-                      onChange={(e) => handleTierChange(index, e)}
-                      placeholder="e.g. VIP"
-                      className={`w-full bg-slate-900 border ${errors[`tier_${index}_name`] ? 'border-red-500/60' : 'border-slate-700'} text-white px-3 py-2.5 rounded-lg focus:ring-1 focus:ring-violet-500 outline-none text-sm transition-all`}
-                    />
-                    {errors[`tier_${index}_name`] && (
-                      <p className="text-red-400 text-xs mt-0.5">{errors[`tier_${index}_name`]}</p>
-                    )}
+            {/* Array-level error (e.g. "at least one tier required") */}
+            {errors.ticketTypes?.root && (
+              <p className="text-red-400 text-xs">{errors.ticketTypes.root.message}</p>
+            )}
+            {errors.ticketTypes?.message && (
+              <p className="text-red-400 text-xs">{errors.ticketTypes.message}</p>
+            )}
+
+            {fields.map((field, index) => {
+              const tierErrors = errors.ticketTypes?.[index];
+              return (
+                <div
+                  key={field.id}
+                  className="bg-slate-950/40 border border-slate-800 hover:border-slate-700 rounded-xl p-4 relative group transition-colors"
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                    {/* Tier Name */}
+                    <div className="md:col-span-1">
+                      <label className="block text-xs text-slate-400 mb-1 font-medium">
+                        Tier Name <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. VIP"
+                        {...register(`ticketTypes.${index}.name`)}
+                        className={tierInputCls(!!tierErrors?.name)}
+                      />
+                      {tierErrors?.name && (
+                        <p className="text-red-400 text-xs mt-0.5">{tierErrors.name.message}</p>
+                      )}
+                    </div>
+
+                    {/* Price */}
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1 font-medium">
+                        Price (₹) <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0"
+                        {...register(`ticketTypes.${index}.price`)}
+                        className={tierInputCls(!!tierErrors?.price)}
+                      />
+                      {tierErrors?.price && (
+                        <p className="text-red-400 text-xs mt-0.5">{tierErrors.price.message}</p>
+                      )}
+                    </div>
+
+                    {/* Capacity */}
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1 font-medium">
+                        Capacity <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="100"
+                        {...register(`ticketTypes.${index}.quantity`)}
+                        className={tierInputCls(!!tierErrors?.quantity)}
+                      />
+                      {tierErrors?.quantity && (
+                        <p className="text-red-400 text-xs mt-0.5">{tierErrors.quantity.message}</p>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Price */}
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1 font-medium">
-                      Price (₹) *
-                    </label>
-                    <input
-                      type="number"
-                      name="price"
-                      min="0"
-                      value={tier.price}
-                      onChange={(e) => handleTierChange(index, e)}
-                      placeholder="0"
-                      className={`w-full bg-slate-900 border ${errors[`tier_${index}_price`] ? 'border-red-500/60' : 'border-slate-700'} text-white px-3 py-2.5 rounded-lg focus:ring-1 focus:ring-violet-500 outline-none text-sm transition-all`}
-                    />
-                    {errors[`tier_${index}_price`] && (
-                      <p className="text-red-400 text-xs mt-0.5">{errors[`tier_${index}_price`]}</p>
-                    )}
-                  </div>
-
-                  {/* Capacity */}
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1 font-medium">
-                      Capacity *
-                    </label>
-                    <input
-                      type="number"
-                      name="quantity"
-                      min="1"
-                      value={tier.quantity}
-                      onChange={(e) => handleTierChange(index, e)}
-                      placeholder="100"
-                      className={`w-full bg-slate-900 border ${errors[`tier_${index}_quantity`] ? 'border-red-500/60' : 'border-slate-700'} text-white px-3 py-2.5 rounded-lg focus:ring-1 focus:ring-violet-500 outline-none text-sm transition-all`}
-                    />
-                    {errors[`tier_${index}_quantity`] && (
-                      <p className="text-red-400 text-xs mt-0.5">{errors[`tier_${index}_quantity`]}</p>
-                    )}
-                  </div>
+                  {/* Remove tier button — visible on group hover, disabled when only 1 tier */}
+                  {fields.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => remove(index)}
+                      className="absolute -top-2.5 -right-2.5 bg-red-500/20 hover:bg-red-500/40 border border-red-500/40 text-red-400 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-all shadow-lg"
+                      aria-label="Remove tier"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
-
-                {/* Remove tier button (only when > 1 tier) */}
-                {ticketTypes.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeTier(index)}
-                    className="absolute -top-2.5 -right-2.5 bg-red-500/20 hover:bg-red-500/40 border border-red-500/40 text-red-400 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-all shadow-lg"
-                    aria-label="Remove tier"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </fieldset>
 
           {/* Submit */}
           <button
             type="submit"
-            disabled={loading}
-            className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg shadow-violet-500/25 transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2"
+            disabled={isSubmitting}
+            className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg shadow-violet-500/25 transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2 text-base"
           >
-            {loading ? (
+            {isSubmitting ? (
               <>
                 <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                 Publishing…

@@ -1,27 +1,38 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import toast from 'react-hot-toast';
 import client from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 
-const LoginPage = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { login, isAuthenticated } = useAuth();
-  const [formData, setFormData] = useState({ email: '', password: '' });
-  const [loading, setLoading] = useState(false);
+const loginSchema = z.object({
+  email:    z.string().email('Please enter a valid email address'),
+  password: z.string().min(1, 'Password is required'),
+});
 
-  // Handle Google OAuth callback token in URL
+const LoginPage = () => {
+  const navigate  = useNavigate();
+  const location  = useLocation();
+  const { login, isAuthenticated } = useAuth();
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm({ resolver: zodResolver(loginSchema) });
+
+  // Handle Google OAuth callback token in URL query params
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const token = params.get('token');
+    const params    = new URLSearchParams(location.search);
+    const token     = params.get('token');
     const authError = params.get('error');
 
     if (token) {
-      // Minimal user object — full profile can be fetched lazily
       login({ token });
       toast.success('Google sign-in successful!');
-      navigate('/dashboard');
+      navigate('/dashboard', { replace: true });
     }
     if (authError) {
       toast.error('Google authentication failed. Please try again.');
@@ -29,44 +40,38 @@ const LoginPage = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Redirect already-authenticated users away from login
+  // Redirect already-authenticated users
   useEffect(() => {
     if (isAuthenticated) navigate('/dashboard', { replace: true });
   }, [isAuthenticated, navigate]);
 
-  const handleChange = (e) =>
-    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+  const onSubmit = async (data) => {
     try {
       const res = await client.post('/api/auth/login', {
-        ...formData,
+        ...data,
         recaptchaToken: 'dummy-token',
       });
 
       if (res.data.message === '2FA required') {
         toast('2FA code sent to your email.', { icon: '🔐' });
-        // TODO: Navigate to a dedicated 2FA verification page
         return;
       }
 
       login(res.data);
       toast.success('Welcome back!');
-      // Redirect to the page the user originally tried to access, or dashboard
       const destination = location.state?.from?.pathname || '/dashboard';
       navigate(destination, { replace: true });
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Login failed. Please try again.');
-    } finally {
-      setLoading(false);
+      toast.error(err.response?.data?.message || 'Login failed. Please check your credentials.');
     }
   };
 
   const handleGoogleLogin = () => {
     window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/google`;
   };
+
+  const inputCls = (hasError) =>
+    `w-full bg-slate-950/50 border ${hasError ? 'border-red-500/60 focus:ring-red-500' : 'border-slate-700 focus:ring-violet-500'} text-white px-4 py-3 rounded-lg focus:ring-2 focus:border-transparent outline-none transition-all placeholder-slate-500`;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950 relative overflow-hidden pt-20">
@@ -79,39 +84,48 @@ const LoginPage = () => {
           <p className="text-slate-400">Sign in to manage your events</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
+          {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">Email Address</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">
+              Email Address
+            </label>
             <input
               type="email"
-              name="email"
-              required
-              value={formData.email}
-              onChange={handleChange}
               placeholder="you@example.com"
-              className="w-full bg-slate-950/50 border border-slate-700 text-white px-4 py-3 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition-all placeholder-slate-500"
+              {...register('email')}
+              className={inputCls(!!errors.email)}
             />
+            {errors.email && (
+              <p className="text-red-400 text-xs mt-1">{errors.email.message}</p>
+            )}
           </div>
 
+          {/* Password */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">Password</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">
+              Password
+            </label>
             <input
               type="password"
-              name="password"
-              required
-              value={formData.password}
-              onChange={handleChange}
               placeholder="••••••••"
-              className="w-full bg-slate-950/50 border border-slate-700 text-white px-4 py-3 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition-all placeholder-slate-500"
+              {...register('password')}
+              className={inputCls(!!errors.password)}
             />
+            {errors.password && (
+              <p className="text-red-400 text-xs mt-1">{errors.password.message}</p>
+            )}
           </div>
 
           <button
             type="submit"
-            disabled={loading}
-            className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-3.5 rounded-lg shadow-lg shadow-violet-500/20 transition-all transform active:scale-[0.98]"
+            disabled={isSubmitting}
+            className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-3.5 rounded-lg shadow-lg shadow-violet-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
           >
-            {loading ? 'Signing in…' : 'Sign In'}
+            {isSubmitting && (
+              <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+            )}
+            {isSubmitting ? 'Signing in…' : 'Sign In'}
           </button>
         </form>
 
@@ -134,7 +148,7 @@ const LoginPage = () => {
           Sign in with Google
         </button>
 
-        <p className="mt-8 text-center text-slate-400">
+        <p className="mt-8 text-center text-slate-400 text-sm">
           Don&apos;t have an account?{' '}
           <Link to="/register" className="text-violet-400 hover:text-violet-300 font-semibold hover:underline">
             Sign Up

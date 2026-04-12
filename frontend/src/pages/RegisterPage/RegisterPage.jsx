@@ -1,48 +1,43 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import toast from 'react-hot-toast';
 import client from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 
-const RegisterPage = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { login } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    role: 'user',
+const registerSchema = z
+  .object({
+    name:            z.string().min(2, 'Name must be at least 2 characters'),
+    email:           z.string().email('Please enter a valid email address'),
+    password:        z.string().min(6, 'Password must be at least 6 characters'),
+    confirmPassword: z.string(),
+    role:            z.enum(['user', 'organizer']),
+  })
+  .refine((d) => d.password === d.confirmPassword, {
+    message: 'Passwords do not match',
+    path:    ['confirmPassword'],
   });
-  const [errors, setErrors] = useState({});
 
-  const handleChange = (e) =>
-    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+const RegisterPage = () => {
+  const navigate  = useNavigate();
+  const location  = useLocation();
+  const { login } = useAuth();
 
-  const validate = () => {
-    const errs = {};
-    if (!formData.name.trim()) errs.name = 'Name is required';
-    if (!formData.email.trim()) errs.email = 'Email is required';
-    if (formData.password.length < 6) errs.password = 'Password must be at least 6 characters';
-    if (formData.password !== formData.confirmPassword)
-      errs.confirmPassword = 'Passwords do not match';
-    return errs;
-  };
+  const {
+    register,
+    handleSubmit,
+    control,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver:      zodResolver(registerSchema),
+    defaultValues: { name: '', email: '', password: '', confirmPassword: '', role: 'user' },
+  });
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const errs = validate();
-    if (Object.keys(errs).length > 0) {
-      setErrors(errs);
-      return;
-    }
-    setErrors({});
-    setLoading(true);
-
+  const onSubmit = async (data) => {
     try {
-      const { confirmPassword, ...payload } = formData;
+      const { confirmPassword, ...payload } = data;
       const res = await client.post('/api/auth/signup', payload);
       login(res.data);
       toast.success('Account created! Welcome to EventEase.');
@@ -50,27 +45,13 @@ const RegisterPage = () => {
       navigate(destination, { replace: true });
     } catch (err) {
       toast.error(err.response?.data?.message || 'Registration failed. Please try again.');
-    } finally {
-      setLoading(false);
     }
   };
 
-  const Field = ({ label, name, type = 'text', placeholder }) => (
-    <div>
-      <label className="block text-sm font-medium text-slate-300 mb-1.5">{label}</label>
-      <input
-        type={type}
-        name={name}
-        placeholder={placeholder}
-        value={formData[name]}
-        onChange={handleChange}
-        className="w-full bg-slate-950/50 border border-slate-700 text-white px-4 py-3 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition-all placeholder-slate-500"
-      />
-      {errors[name] && (
-        <p className="text-red-400 text-xs mt-1">{errors[name]}</p>
-      )}
-    </div>
-  );
+  const inputCls = (hasError) =>
+    `w-full bg-slate-950/50 border ${
+      hasError ? 'border-red-500/60 focus:ring-red-500' : 'border-slate-700 focus:ring-violet-500'
+    } text-white px-4 py-3 rounded-lg focus:ring-2 focus:border-transparent outline-none transition-all placeholder-slate-500`;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950 relative overflow-hidden pt-20 pb-12">
@@ -83,46 +64,101 @@ const RegisterPage = () => {
           <p className="text-slate-400">Join EventEase and start booking today</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <Field label="Full Name" name="name" placeholder="Jane Doe" />
-          <Field label="Email Address" name="email" type="email" placeholder="you@example.com" />
-          <Field label="Password" name="password" type="password" placeholder="••••••••" />
-          <Field label="Confirm Password" name="confirmPassword" type="password" placeholder="••••••••" />
+        <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
 
-          {/* Role selector */}
+          {/* Name */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">Full Name</label>
+            <input
+              type="text"
+              placeholder="Jane Doe"
+              {...register('name')}
+              className={inputCls(!!errors.name)}
+            />
+            {errors.name && <p className="text-red-400 text-xs mt-1">{errors.name.message}</p>}
+          </div>
+
+          {/* Email */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">Email Address</label>
+            <input
+              type="email"
+              placeholder="you@example.com"
+              {...register('email')}
+              className={inputCls(!!errors.email)}
+            />
+            {errors.email && <p className="text-red-400 text-xs mt-1">{errors.email.message}</p>}
+          </div>
+
+          {/* Password */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">Password</label>
+            <input
+              type="password"
+              placeholder="Min. 6 characters"
+              {...register('password')}
+              className={inputCls(!!errors.password)}
+            />
+            {errors.password && <p className="text-red-400 text-xs mt-1">{errors.password.message}</p>}
+          </div>
+
+          {/* Confirm Password */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">Confirm Password</label>
+            <input
+              type="password"
+              placeholder="Re-enter password"
+              {...register('confirmPassword')}
+              className={inputCls(!!errors.confirmPassword)}
+            />
+            {errors.confirmPassword && (
+              <p className="text-red-400 text-xs mt-1">{errors.confirmPassword.message}</p>
+            )}
+          </div>
+
+          {/* Role — controlled via RHF Controller */}
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-1.5">I want to</label>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { value: 'user', label: 'Buy Tickets', icon: '🎟' },
-                { value: 'organizer', label: 'Host Events', icon: '🎤' },
-              ].map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setFormData((p) => ({ ...p, role: opt.value }))}
-                  className={`py-3 px-4 rounded-lg border text-sm font-medium transition-all ${
-                    formData.role === opt.value
-                      ? 'border-violet-500 bg-violet-500/10 text-violet-300'
-                      : 'border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600'
-                  }`}
-                >
-                  {opt.icon} {opt.label}
-                </button>
-              ))}
-            </div>
+            <Controller
+              name="role"
+              control={control}
+              render={({ field }) => (
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { value: 'user',      label: 'Buy Tickets', icon: '🎟' },
+                    { value: 'organizer', label: 'Host Events',  icon: '🎤' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => field.onChange(opt.value)}
+                      className={`py-3 px-4 rounded-lg border text-sm font-medium transition-all ${
+                        field.value === opt.value
+                          ? 'border-violet-500 bg-violet-500/10 text-violet-300'
+                          : 'border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600'
+                      }`}
+                    >
+                      {opt.icon} {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            />
           </div>
 
           <button
             type="submit"
-            disabled={loading}
-            className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-3.5 rounded-lg shadow-lg shadow-violet-500/20 transition-all transform active:scale-[0.98]"
+            disabled={isSubmitting}
+            className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-3.5 rounded-lg shadow-lg shadow-violet-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
           >
-            {loading ? 'Creating account…' : 'Create Account'}
+            {isSubmitting && (
+              <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+            )}
+            {isSubmitting ? 'Creating account…' : 'Create Account'}
           </button>
         </form>
 
-        <p className="mt-8 text-center text-slate-400">
+        <p className="mt-8 text-center text-slate-400 text-sm">
           Already have an account?{' '}
           <Link to="/login" className="text-violet-400 hover:text-violet-300 font-semibold hover:underline">
             Sign In

@@ -1,101 +1,193 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import toast from 'react-hot-toast';
+import client from '../../api/client';
+import { useAuth } from '../../context/AuthContext';
+
+const profileSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  email: z.string().email('Invalid email address'),
+});
+
+const ROLE_LABEL = { user: 'Event Enthusiast', organizer: 'Event Organizer', admin: 'Admin' };
+const ROLE_COLOR = {
+  user:      'bg-violet-500/20 text-violet-300 border-violet-500/30',
+  organizer: 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30',
+  admin:     'bg-amber-500/20 text-amber-300 border-amber-500/30',
+};
 
 const Profile = () => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { user, login, token } = useAuth();
+  const [editing, setEditing]   = useState(false);
+  const [saving, setSaving]     = useState(false);
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        // Assuming endpoint /api/users/profile exists based on your backend
-        // If not, use /api/users/<id> if you store ID in localstorage, 
-        // OR rely on the endpoint that returns "me" from token.
-        // Based on your routes, you might need to implement getProfile in backend or use what's available.
-        // For now, let's try the dashboard endpoint or specific profile endpoint if you made one.
-        // I will assume /api/users/profile or modify the route to fetch 'me'.
-        // Let's assume you fetch it via dashboard or stored user data. 
-        // For this UI demo, I'll fetch from a hypothetical /api/users/me or just mock if strictly needed.
-        // UPDATE: Your User Controller has getUserProfile by ID. 
-        // We need to decode token to get ID first in frontend usually.
-        // To keep it simple, I'll assume you added a route '/api/users/me' or I will fetch via dashboard route which returns user info inside sometimes.
-        
-        // Actually, let's just use the dashboard endpoint to get user name/email for now since that works
-        const res = await axios.get('http://localhost:5000/api/users/dashboard', {
-             headers: { Authorization: `Bearer ${token}` }
-        });
-        // The dashboard endpoint returns tickets, we might need a separate call for full profile details
-        // Let's try fetching the user profile using the ID from the token (if you have a way to get it)
-        // OR better: Create a simple 'me' route in backend. 
-        // Since I can't touch backend now, I'll assume we pass 'user' as prop OR store user in Context.
-        // Fallback: Display generic info if API missing.
-        setUser({ name: "Dev Pratap Singh", email: "devpratap@example.com", role: "User" }); // Placeholder until connected
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProfile();
-  }, []);
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isDirty },
+  } = useForm({
+    resolver: zodResolver(profileSchema),
+    defaultValues: { name: user?.name || '', email: user?.email || '' },
+  });
 
-  if (loading) return <div className="min-h-screen bg-slate-950 pt-24 text-center text-white">Loading...</div>;
+  const initials = (user?.name || 'U')
+    .split(' ')
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
+  const onSubmit = async (data) => {
+    if (!user?._id) {
+      toast.error('Could not identify your account. Please log in again.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await client.put(`/api/users/${user._id}`, data);
+      // Merge the updated fields back into auth context + localStorage
+      login({ token, ...user, ...res.data });
+      toast.success('Profile updated successfully.');
+      setEditing(false);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update profile.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const cancelEdit = () => {
+    reset({ name: user?.name || '', email: user?.email || '' });
+    setEditing(false);
+  };
 
   return (
-    <div className="min-h-screen bg-slate-950 pt-24 pb-12 px-4">
+    <div className="min-h-screen bg-slate-950 pt-24 pb-16 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl mx-auto">
+
         <h1 className="text-3xl font-bold text-white mb-8">My Profile</h1>
 
-        <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-2xl flex flex-col items-center text-center sm:flex-row sm:text-left gap-8">
-          
-          {/* Avatar */}
-          <div className="relative">
-            <div className="w-32 h-32 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 p-1">
-              <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center overflow-hidden">
-                 {/* Placeholder for User Image */}
-                 <span className="text-4xl font-bold text-white">{user?.name?.charAt(0) || 'U'}</span>
+        {/* ── Profile Card ──────────────────────────────────────────── */}
+        <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 md:p-8 shadow-2xl mb-6">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+
+            {/* Avatar */}
+            <div className="relative flex-shrink-0">
+              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 p-0.5">
+                <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center">
+                  <span className="text-3xl font-bold text-white">{initials}</span>
+                </div>
               </div>
+              <div className="absolute bottom-1 right-1 w-4 h-4 bg-emerald-500 border-2 border-slate-900 rounded-full" />
             </div>
-            <div className="absolute bottom-2 right-2 w-6 h-6 bg-green-500 border-4 border-slate-900 rounded-full"></div>
+
+            {/* Info / Edit Form */}
+            <div className="flex-1 w-full">
+              {editing ? (
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                      Full Name
+                    </label>
+                    <input
+                      {...register('name')}
+                      className="w-full bg-slate-950/50 border border-slate-700 text-white px-4 py-2.5 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition-all text-sm"
+                    />
+                    {errors.name && (
+                      <p className="text-red-400 text-xs mt-1">{errors.name.message}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                      Email Address
+                    </label>
+                    <input
+                      {...register('email')}
+                      type="email"
+                      className="w-full bg-slate-950/50 border border-slate-700 text-white px-4 py-2.5 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition-all text-sm"
+                    />
+                    {errors.email && (
+                      <p className="text-red-400 text-xs mt-1">{errors.email.message}</p>
+                    )}
+                  </div>
+                  <div className="flex gap-3 pt-1">
+                    <button
+                      type="submit"
+                      disabled={saving || !isDirty}
+                      className="flex items-center gap-2 px-5 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-semibold transition-colors"
+                    >
+                      {saving && (
+                        <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      )}
+                      {saving ? 'Saving…' : 'Save Changes'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelEdit}
+                      className="px-5 py-2 border border-slate-700 text-slate-300 hover:bg-slate-800 rounded-lg text-sm font-semibold transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-0.5">Full Name</p>
+                    <h2 className="text-xl font-bold text-white">{user?.name || '—'}</h2>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-0.5">Email Address</p>
+                    <p className="text-slate-300">{user?.email || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1">Role</p>
+                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold border ${ROLE_COLOR[user?.role] || ROLE_COLOR.user}`}>
+                      {ROLE_LABEL[user?.role] || 'Event Enthusiast'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setEditing(true)}
+                    className="mt-2 flex items-center gap-2 px-4 py-2 border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white rounded-lg text-sm font-semibold transition-colors"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Edit Profile
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-
-          {/* Details */}
-          <div className="flex-1 space-y-4">
-            <div>
-              <label className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Full Name</label>
-              <h2 className="text-2xl font-bold text-white">{user?.name}</h2>
-            </div>
-            
-            <div>
-              <label className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Email Address</label>
-              <p className="text-slate-300 font-medium">{user?.email}</p>
-            </div>
-
-            <div>
-               <label className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Role</label>
-               <span className="inline-block mt-1 bg-violet-500/20 text-violet-300 text-xs px-3 py-1 rounded-full border border-violet-500/30">
-                 {user?.role || 'Event Enthusiast'}
-               </span>
-            </div>
-          </div>
-
-          {/* Edit Button (Visual only) */}
-          <button className="h-fit px-5 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition">
-            Edit Profile
-          </button>
         </div>
 
-        {/* Account Settings Section */}
-        <div className="mt-8 grid gap-4">
-          <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl flex justify-between items-center cursor-pointer hover:bg-slate-800/50 transition">
-            <span className="text-slate-300">Change Password</span>
-            <span className="text-slate-500">→</span>
-          </div>
-          <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl flex justify-between items-center cursor-pointer hover:bg-slate-800/50 transition">
-            <span className="text-slate-300">Privacy Settings</span>
-            <span className="text-slate-500">→</span>
-          </div>
+        {/* ── Account Settings ───────────────────────────────────────── */}
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider px-1">
+            Account Settings
+          </h2>
+          {[
+            { label: 'Change Password', icon: '🔐' },
+            { label: 'Notification Preferences', icon: '🔔' },
+            { label: 'Privacy Settings', icon: '🛡' },
+          ].map((item) => (
+            <button
+              key={item.label}
+              className="w-full bg-slate-900/40 hover:bg-slate-800/60 border border-slate-800 hover:border-slate-700 px-5 py-4 rounded-xl flex justify-between items-center cursor-pointer transition-colors text-left group"
+              onClick={() => toast('Coming soon!', { icon: '🚧' })}
+            >
+              <span className="text-slate-300 group-hover:text-white transition-colors text-sm font-medium flex items-center gap-3">
+                <span>{item.icon}</span>
+                {item.label}
+              </span>
+              <svg className="w-4 h-4 text-slate-500 group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          ))}
         </div>
 
       </div>
