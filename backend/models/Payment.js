@@ -7,7 +7,8 @@ const PaymentSchema = new mongoose.Schema({
     status: { type: String, enum: ['success', 'failure'], required: true },
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     event: { type: mongoose.Schema.Types.ObjectId, ref: 'Event', required: true },
-    amount: { type: Number, required: true }
+    amount:    { type: Number, required: true },
+    promoCode: { type: String, default: null },  // code string if a discount was applied
 }, { timestamps: true });
 
 module.exports = mongoose.model('Payment', PaymentSchema);

@@ -31,11 +31,13 @@ app.use(cors()); // To enable Cross-Origin Resource Sharing
 app.use(passport.initialize()); // Initialize Passport
 
 // Define API Routes
-app.use('/api/auth', require('./routes/authRoutes'));
-app.use('/api/events', require('./routes/eventRoutes'));
-app.use('/api/payments', require('./routes/paymentRoutes'));
-app.use('/api/tickets', require('./routes/ticketRoutes'));
-app.use('/api/users', require('./routes/userRoutes')); // To fetch user data (required for Dashboard)
+app.use('/api/auth',      require('./routes/authRoutes'));
+app.use('/api/events',    require('./routes/eventRoutes'));
+app.use('/api/payments',  require('./routes/paymentRoutes'));
+app.use('/api/tickets',   require('./routes/ticketRoutes'));
+app.use('/api/users',     require('./routes/userRoutes'));
+app.use('/api/promo',     require('./routes/promoRoutes'));
+app.use('/api/waitlist',  require('./routes/waitlistRoutes'));
 
 // A simple test route
 app.get('/', (req, res) => {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Tag, ChevronDown, ChevronUp, X, Check, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import client from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
@@ -55,16 +56,25 @@ const EventDetails = () => {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [imgError, setImgError]             = useState(false);
 
+  // Promo code state
+  const [promoOpen, setPromoOpen]       = useState(false);
+  const [promoInput, setPromoInput]     = useState('');
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [appliedPromo, setAppliedPromo] = useState(null); // { code, discountAmount, finalAmount }
+
+  // Waitlist state: map of tierId → { onWaitlist, position, total, loading }
+  const [waitlistMap, setWaitlistMap]     = useState({});
+  const [waitlistLoading, setWaitlistLoading] = useState({});
+
   const timeLeft = useCountdown(event?.date);
 
-  // ── Fetch event (public endpoint — no auth required) ────────────────────────
+  // ── Fetch event ──────────────────────────────────────────────────────────────
   useEffect(() => {
     const fetchEvent = async () => {
       setLoading(true);
       try {
         const res = await client.get(`/api/events/${id}`);
         setEvent(res.data);
-        // Auto-select first tier that still has availability
         const firstAvail = res.data.ticketTypes?.find((t) => t.available > 0);
         setSelectedTier(firstAvail || res.data.ticketTypes?.[0] || null);
       } catch (err) {
@@ -77,12 +87,115 @@ const EventDetails = () => {
     fetchEvent();
   }, [id]);
 
-  // Clamp quantity whenever the selected tier changes
+  // ── Fetch waitlist positions for sold-out tiers (auth only) ─────────────────
+  useEffect(() => {
+    if (!event || !isAuthenticated) return;
+    const soldOutTiers = event.ticketTypes?.filter((t) => t.available === 0) || [];
+    if (soldOutTiers.length === 0) return;
+
+    soldOutTiers.forEach(async (tier) => {
+      try {
+        const res = await client.get('/api/waitlist/position', {
+          params: { eventId: id, ticketTypeId: tier._id },
+        });
+        setWaitlistMap((prev) => ({ ...prev, [tier._id]: res.data }));
+      } catch {
+        // silently ignore — waitlist position is non-critical
+      }
+    });
+  }, [event, isAuthenticated, id]);
+
+  // ── Clamp quantity when selected tier changes; clear promo ──────────────────
   useEffect(() => {
     if (selectedTier) {
       setQuantity((q) => Math.min(q, Math.max(1, selectedTier.available)));
     }
+    setAppliedPromo(null);
+    setPromoInput('');
+    setPromoOpen(false);
   }, [selectedTier]);
+
+  // Clear promo when quantity changes (discount amount changes)
+  useEffect(() => {
+    setAppliedPromo(null);
+  }, [quantity]);
+
+  // ── Apply promo code ─────────────────────────────────────────────────────────
+  const handleApplyPromo = async () => {
+    if (!promoInput.trim()) return;
+    if (!selectedTier) return;
+    setPromoLoading(true);
+    try {
+      const { data } = await client.post('/api/promo/validate', {
+        code:         promoInput.trim(),
+        eventId:      id,
+        ticketTypeId: selectedTier._id,
+        quantity,
+      });
+      if (data.valid) {
+        setAppliedPromo({
+          code:           data.code,
+          discountAmount: data.discountAmount,
+          finalAmount:    data.finalAmount,
+        });
+        toast.success(`"${data.code}" applied — ₹${data.discountAmount.toLocaleString('en-IN')} off!`);
+      } else {
+        toast.error(data.message || 'Invalid promo code.');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not validate promo code.');
+    } finally {
+      setPromoLoading(false);
+    }
+  };
+
+  const handleRemovePromo = () => {
+    setAppliedPromo(null);
+    setPromoInput('');
+  };
+
+  // ── Waitlist handlers ────────────────────────────────────────────────────────
+  const handleJoinWaitlist = async (tier) => {
+    if (!isAuthenticated) {
+      toast.error('Please log in to join the waitlist.');
+      navigate('/login', { state: { from: { pathname: `/events/${id}` } } });
+      return;
+    }
+    setWaitlistLoading((prev) => ({ ...prev, [tier._id]: true }));
+    try {
+      const { data } = await client.post('/api/waitlist/join', {
+        eventId:      id,
+        ticketTypeId: tier._id,
+      });
+      setWaitlistMap((prev) => ({
+        ...prev,
+        [tier._id]: { onWaitlist: true, position: data.position, total: data.total, status: 'waiting' },
+      }));
+      toast.success(`You're #${data.position} on the waitlist!`);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not join waitlist.');
+    } finally {
+      setWaitlistLoading((prev) => ({ ...prev, [tier._id]: false }));
+    }
+  };
+
+  const handleLeaveWaitlist = async (tier) => {
+    setWaitlistLoading((prev) => ({ ...prev, [tier._id]: true }));
+    try {
+      await client.delete('/api/waitlist/leave', {
+        data: { eventId: id, ticketTypeId: tier._id },
+      });
+      setWaitlistMap((prev) => ({
+        ...prev,
+        [tier._id]: { onWaitlist: false, position: null, total: null },
+      }));
+      toast.success('Removed from waitlist.');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not leave waitlist.');
+    } finally {
+      setWaitlistLoading((prev) => ({ ...prev, [tier._id]: false }));
+    }
+  };
 
   // ── Payment handler ──────────────────────────────────────────────────────────
   const handlePayment = async () => {
@@ -105,22 +218,20 @@ const EventDetails = () => {
     setPaymentLoading(true);
 
     try {
-      // ── 1. Load Razorpay SDK ─────────────────────────────────────────────
       const sdkLoaded = await loadRazorpayScript();
       if (!sdkLoaded) {
         toast.error('Could not load payment SDK. Please check your connection.');
         return;
       }
 
-      // ── 2. Create Order (server calculates amount — do NOT send amount) ──
-      // POST /api/payments/order requires: { eventId, ticketTypeId, quantity }
       const { data: orderData } = await client.post('/api/payments/order', {
         eventId:      event._id,
         ticketTypeId: selectedTier._id,
         quantity,
+        promoCode:    appliedPromo?.code || null,
       });
 
-      // ── 2b. Free ticket fast-path — skip Razorpay modal entirely ─────────
+      // Free ticket fast-path
       if (orderData.isFree) {
         try {
           await client.post('/api/payments/verify', {
@@ -128,6 +239,7 @@ const EventDetails = () => {
             eventId:      event._id,
             ticketTypeId: selectedTier._id,
             quantity,
+            promoCode:    appliedPromo?.code || null,
           });
           toast.success('Booking confirmed! Your free ticket is ready.');
           navigate('/my-tickets');
@@ -138,10 +250,9 @@ const EventDetails = () => {
         return;
       }
 
-      // ── 3. Open Razorpay modal ────────────────────────────────────────────
       const options = {
         key:         import.meta.env.VITE_RAZORPAY_KEY_ID,
-        amount:      orderData.amount,   // in paise, from server
+        amount:      orderData.amount,
         currency:    orderData.currency || 'INR',
         name:        'EventEase',
         description: `${selectedTier.name} × ${quantity} — ${event.title}`,
@@ -153,18 +264,15 @@ const EventDetails = () => {
         theme: { color: '#7c3aed' },
 
         handler: async (response) => {
-          // ── 4. Verify payment & create tickets ─────────────────────────
-          // POST /api/payments/verify requires:
-          // { order_id, payment_id, razorpay_signature, eventId, ticketTypeId, quantity }
-          // Do NOT send amount — server fetches it from Razorpay directly.
           try {
             const { data: verifyData } = await client.post('/api/payments/verify', {
-              order_id:          response.razorpay_order_id,
-              payment_id:        response.razorpay_payment_id,
+              order_id:           response.razorpay_order_id,
+              payment_id:         response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
               eventId:            event._id,
               ticketTypeId:       selectedTier._id,
               quantity,
+              promoCode:          appliedPromo?.code || null,
             });
 
             if (verifyData.success) {
@@ -198,8 +306,6 @@ const EventDetails = () => {
       toast.error(err.response?.data?.message || 'Could not initiate payment. Please try again.');
       setPaymentLoading(false);
     }
-    // Note: setPaymentLoading(false) is intentionally NOT called here in the
-    // success path — the handler redirects the user away from the page.
   };
 
   // ── Render states ────────────────────────────────────────────────────────────
@@ -223,13 +329,15 @@ const EventDetails = () => {
     );
   }
 
-  const totalDisplay = selectedTier
-    ? selectedTier.price === 0
-      ? 'Free'
-      : `₹${(selectedTier.price * quantity).toLocaleString('en-IN')}`
-    : '—';
-
+  // Derived display values
   const isSoldOut = !selectedTier || selectedTier.available === 0;
+
+  const totalDisplay = (() => {
+    if (!selectedTier) return '—';
+    if (appliedPromo) return `₹${appliedPromo.finalAmount.toLocaleString('en-IN')}`;
+    if (selectedTier.price === 0) return 'Free';
+    return `₹${(selectedTier.price * quantity).toLocaleString('en-IN')}`;
+  })();
 
   // ── Main render ──────────────────────────────────────────────────────────────
   return (
@@ -348,40 +456,74 @@ const EventDetails = () => {
               {event.ticketTypes && event.ticketTypes.length > 0 ? (
                 <div className="space-y-3 mb-6">
                   {event.ticketTypes.map((tier) => {
-                    const isSelected = selectedTier?._id === tier._id;
-                    const soldOut    = tier.available === 0;
+                    const isSelected  = selectedTier?._id === tier._id;
+                    const soldOut     = tier.available === 0;
+                    const wl          = waitlistMap[tier._id];
+                    const wlLoading   = waitlistLoading[tier._id];
+
                     return (
-                      <motion.button
-                        key={tier._id}
-                        onClick={() => !soldOut && setSelectedTier(tier)}
-                        disabled={soldOut}
-                        whileTap={!soldOut ? { scale: 0.97 } : {}}
-                        className={`w-full text-left p-4 rounded-xl border transition-all duration-200 ${
-                          soldOut
-                            ? 'opacity-50 cursor-not-allowed bg-slate-950/30 border-slate-800'
-                            : isSelected
-                              ? 'bg-violet-600/20 border-violet-500 shadow-lg shadow-violet-500/10'
-                              : 'bg-slate-950/50 border-slate-800 hover:border-slate-600 cursor-pointer'
-                        }`}
-                      >
-                        <div className="flex justify-between items-center mb-1">
-                          <span className={`font-bold ${isSelected ? 'text-white' : 'text-slate-300'}`}>
-                            {tier.name}
-                          </span>
-                          <span className="text-white font-bold">
-                            {tier.price === 0 ? 'Free' : `₹${tier.price.toLocaleString('en-IN')}`}
-                          </span>
-                        </div>
-                        <div className="text-xs text-slate-400">
-                          {soldOut ? (
-                            <span className="text-red-400 font-medium">Sold Out</span>
-                          ) : (
-                            <span className={tier.available < 20 ? 'text-amber-400 font-medium' : ''}>
-                              {tier.available} spots left
+                      <div key={tier._id}>
+                        <motion.button
+                          onClick={() => !soldOut && setSelectedTier(tier)}
+                          disabled={soldOut}
+                          whileTap={!soldOut ? { scale: 0.97 } : {}}
+                          className={`w-full text-left p-4 rounded-xl border transition-all duration-200 ${
+                            soldOut
+                              ? 'opacity-60 cursor-not-allowed bg-slate-950/30 border-slate-800'
+                              : isSelected
+                                ? 'bg-violet-600/20 border-violet-500 shadow-lg shadow-violet-500/10'
+                                : 'bg-slate-950/50 border-slate-800 hover:border-slate-600 cursor-pointer'
+                          }`}
+                        >
+                          <div className="flex justify-between items-center mb-1">
+                            <span className={`font-bold ${isSelected ? 'text-white' : 'text-slate-300'}`}>
+                              {tier.name}
                             </span>
-                          )}
-                        </div>
-                      </motion.button>
+                            <span className="text-white font-bold">
+                              {tier.price === 0 ? 'Free' : `₹${tier.price.toLocaleString('en-IN')}`}
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-400">
+                            {soldOut ? (
+                              <span className="text-red-400 font-medium">Sold Out</span>
+                            ) : (
+                              <span className={tier.available < 20 ? 'text-amber-400 font-medium' : ''}>
+                                {tier.available} spots left
+                              </span>
+                            )}
+                          </div>
+                        </motion.button>
+
+                        {/* Waitlist button for sold-out tiers */}
+                        {soldOut && isAuthenticated && (
+                          <motion.button
+                            initial={{ opacity: 0, y: -4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            onClick={() => wl?.onWaitlist ? handleLeaveWaitlist(tier) : handleJoinWaitlist(tier)}
+                            disabled={wlLoading}
+                            className={`w-full mt-1.5 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-xs font-semibold transition-all ${
+                              wl?.onWaitlist
+                                ? 'bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20'
+                                : 'bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700'
+                            }`}
+                          >
+                            {wlLoading ? (
+                              <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                            ) : wl?.onWaitlist ? (
+                              <>
+                                <Clock className="w-3 h-3" />
+                                You're #{wl.position} on waitlist — Leave
+                              </>
+                            ) : (
+                              <>
+                                <Clock className="w-3 h-3" />
+                                Join Waitlist
+                                {wl?.total ? ` (${wl.total} waiting)` : ''}
+                              </>
+                            )}
+                          </motion.button>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
@@ -391,7 +533,7 @@ const EventDetails = () => {
 
               {/* Quantity selector */}
               {!isSoldOut && (
-                <div className="flex justify-between items-center mb-6 bg-slate-950/50 p-3 rounded-xl border border-slate-800">
+                <div className="flex justify-between items-center mb-4 bg-slate-950/50 p-3 rounded-xl border border-slate-800">
                   <span className="text-slate-300 text-sm font-medium">Quantity</span>
                   <div className="flex items-center gap-3">
                     <button
@@ -417,12 +559,86 @@ const EventDetails = () => {
                 </div>
               )}
 
+              {/* Promo code section (only for paid, non-sold-out tiers) */}
+              {!isSoldOut && selectedTier?.price > 0 && (
+                <div className="mb-4">
+                  {appliedPromo ? (
+                    // Applied promo pill
+                    <div className="flex items-center justify-between bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-4 py-2.5">
+                      <div className="flex items-center gap-2 text-emerald-400 text-sm font-semibold">
+                        <Check className="w-4 h-4" />
+                        <span>"{appliedPromo.code}" applied</span>
+                        <span className="text-emerald-300">
+                          — ₹{appliedPromo.discountAmount.toLocaleString('en-IN')} off
+                        </span>
+                      </div>
+                      <button onClick={handleRemovePromo} className="text-slate-400 hover:text-white transition-colors ml-2">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    // Collapsible promo input
+                    <>
+                      <button
+                        onClick={() => setPromoOpen((v) => !v)}
+                        className="flex items-center gap-2 text-violet-400 hover:text-violet-300 text-sm font-medium transition-colors"
+                      >
+                        <Tag className="w-4 h-4" />
+                        Have a promo code?
+                        {promoOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                      </button>
+
+                      <AnimatePresence>
+                        {promoOpen && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="flex gap-2 mt-2">
+                              <input
+                                type="text"
+                                value={promoInput}
+                                onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                                onKeyDown={(e) => e.key === 'Enter' && handleApplyPromo()}
+                                placeholder="ENTER CODE"
+                                className="flex-1 bg-slate-950/70 border border-slate-700 focus:border-violet-500 text-white text-sm px-3 py-2 rounded-lg outline-none transition-colors placeholder:text-slate-600 font-mono tracking-widest"
+                              />
+                              <button
+                                onClick={handleApplyPromo}
+                                disabled={promoLoading || !promoInput.trim()}
+                                className="px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-1.5"
+                              >
+                                {promoLoading ? (
+                                  <div className="w-3.5 h-3.5 border-2 border-white/50 border-t-white rounded-full animate-spin" />
+                                ) : (
+                                  'Apply'
+                                )}
+                              </button>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </>
+                  )}
+                </div>
+              )}
+
               {/* Total & CTA */}
               <div className="border-t border-slate-800 pt-5">
                 {!isSoldOut && (
                   <div className="flex justify-between items-center mb-4">
                     <span className="text-slate-400 text-sm">Total</span>
-                    <span className="text-2xl font-bold text-white">{totalDisplay}</span>
+                    <div className="text-right">
+                      {appliedPromo && (
+                        <div className="text-sm text-slate-500 line-through">
+                          ₹{(selectedTier.price * quantity).toLocaleString('en-IN')}
+                        </div>
+                      )}
+                      <span className="text-2xl font-bold text-white">{totalDisplay}</span>
+                    </div>
                   </div>
                 )}
 

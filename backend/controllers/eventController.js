@@ -413,37 +413,56 @@ exports.exportAttendeesCSV = async (req, res) => {
         if (!event) return res.status(404).json({ message: 'Event not found' });
         if (event.organizer.toString() !== req.user.id) return res.status(401).json({ message: 'Not authorized' });
 
-        const tickets = await Ticket.find({ event: req.params.id }).populate('user', 'name email');
+        const Payment = require('../models/Payment');
+
+        const [tickets, payments] = await Promise.all([
+            Ticket.find({ event: req.params.id }).populate('user', 'name email'),
+            Payment.find({ event: req.params.id }, 'orderId promoCode').lean(),
+        ]);
+
+        // Build a map from orderId → promoCode for quick lookup
+        // Tickets don't store orderId, so we match by ticketId prefix or just pull all payments
+        // Since Payment.event is indexed, this is fast even for large events
+        const promoByTicketId = {};
+        payments.forEach(p => {
+            if (p.promoCode) promoByTicketId[p._id.toString()] = p.promoCode;
+        });
 
         const data = tickets.map(ticket => ({
-            'Ticket ID': ticket.ticketId || ticket._id,
-            'User Name': ticket.user ? ticket.user.name : 'N/A',
-            'User Email': ticket.user ? ticket.user.email : 'N/A',
-            'Ticket Type': ticket.ticketTypeName || 'Standard',
-            'Price Paid': ticket.price,
-            'Purchase Date': ticket.createdAt ? ticket.createdAt.toLocaleString() : 'N/A',
-            'Status': ticket.status
+            'Ticket ID':      ticket.ticketId || ticket._id.toString(),
+            'User Name':      ticket.user ? ticket.user.name : 'N/A',
+            'User Email':     ticket.user ? ticket.user.email : 'N/A',
+            'Ticket Type':    ticket.ticketTypeName || 'Standard',
+            'Price Paid':     ticket.price === 0 ? 'Free' : `₹${ticket.price}`,
+            'Purchase Date':  ticket.createdAt ? ticket.createdAt.toLocaleString('en-IN') : 'N/A',
+            'Status':         ticket.status,
+            'Check-In Time':  ticket.checkedInAt ? ticket.checkedInAt.toLocaleString('en-IN') : '—',
+            'Promo Code':     promoByTicketId[ticket._id.toString()] || '—',
         }));
 
         const columns = [
-            { key: 'Ticket ID', header: 'Ticket ID' },
-            { key: 'User Name', header: 'User Name' },
-            { key: 'User Email', header: 'User Email' },
-            { key: 'Ticket Type', header: 'Ticket Type' },
-            { key: 'Price Paid', header: 'Price Paid' },
+            { key: 'Ticket ID',     header: 'Ticket ID' },
+            { key: 'User Name',     header: 'User Name' },
+            { key: 'User Email',    header: 'User Email' },
+            { key: 'Ticket Type',   header: 'Ticket Type' },
+            { key: 'Price Paid',    header: 'Price Paid' },
             { key: 'Purchase Date', header: 'Purchase Date' },
-            { key: 'Status', header: 'Status' },
+            { key: 'Status',        header: 'Status' },
+            { key: 'Check-In Time', header: 'Check-In Time' },
+            { key: 'Promo Code',    header: 'Promo Code' },
         ];
 
-        stringify(data, { header: true, columns: columns }, (err, output) => {
+        stringify(data, { header: true, columns }, (err, output) => {
             if (err) throw err;
+            const safeName = event.title.replace(/[^a-zA-Z0-9]/g, '_');
+            const dateStr  = new Date().toISOString().slice(0, 10);
             res.header('Content-Type', 'text/csv');
-            res.attachment(`${event.title.replace(/ /g, '_')}_attendees.csv`);
+            res.attachment(`${safeName}_attendees_${dateStr}.csv`);
             res.send(output);
         });
 
     } catch (error) {
         console.error('Error exporting attendees:', error);
-        res.status(500).json({ message: "Server Error" });
+        res.status(500).json({ message: 'Server Error' });
     }
 };

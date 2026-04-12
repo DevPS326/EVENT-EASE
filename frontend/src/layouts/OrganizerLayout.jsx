@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { NavLink, Outlet, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, PlusCircle, ScanLine, Menu, X, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, ScanLine, Tag, Menu, X, ChevronRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const NAV_ITEMS = [
   { to: '/organizer/dashboard',    label: 'Dashboard',    Icon: LayoutDashboard },
   { to: '/organizer/create-event', label: 'Create Event', Icon: PlusCircle },
   { to: '/organizer/check-in',     label: 'Check-In',     Icon: ScanLine },
+  { to: '/organizer/promo-codes',  label: 'Promo Codes',  Icon: Tag },
 ];
 
 const OrganizerLayout = () => {

@@ -1,7 +1,9 @@
 const mongoose = require('mongoose');
-const Ticket = require('../models/Ticket');
-const Event = require('../models/Event');
-const User = require('../models/User');
+const Ticket   = require('../models/Ticket');
+const Event    = require('../models/Event');
+const User     = require('../models/User');
+const Waitlist = require('../models/Waitlist');
+const { sendEmail } = require('../utils/emailService');
 
 /**
  * @desc  Check in a ticket by its string ticketId (the TKT-... value in the QR)
@@ -116,6 +118,33 @@ exports.getMyTickets = async (req, res) => {
   }
 };
 
+// ─── Waitlist notification helper (non-blocking, called outside transactions) ──
+async function notifyWaitlist(eventId, ticketTypeId) {
+  const entry = await Waitlist.findOne({ event: eventId, ticketType: ticketTypeId, status: 'waiting' })
+    .sort({ createdAt: 1 })
+    .populate('user', 'name email')
+    .populate('event', 'title');
+
+  if (!entry || !entry.user?.email) return;
+
+  const eventTitle = entry.event?.title || 'your event';
+  const bookUrl    = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/events/${eventId}`;
+
+  await sendEmail(
+    entry.user.email,
+    `A spot just opened for ${eventTitle}!`,
+    `<h2>Good news, ${entry.user.name || 'there'}!</h2>
+     <p>A ticket for <strong>${eventTitle}</strong> has just become available.</p>
+     <p>Book your spot now before it's gone — this notification was sent to you because you joined the waitlist.</p>
+     <p><a href="${bookUrl}" style="background:#7c3aed;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:bold;">Book Now</a></p>
+     <p style="color:#888;font-size:12px;">Note: availability is not guaranteed — first come, first served.</p>`
+  );
+
+  entry.status     = 'notified';
+  entry.notifiedAt = new Date();
+  await entry.save();
+}
+
 /**
  * @desc Cancel a ticket (atomic)
  * @route PUT /api/tickets/:id/cancel
@@ -130,6 +159,10 @@ exports.cancelTicket = async (req, res) => {
 
   // IMPORTANT: MongoDB transactions require replica set (or Atlas). Make sure your DB supports transactions.
   const session = await mongoose.startSession();
+
+  // Hoisted so waitlist notification can access them after the transaction commits
+  let cancelledEventId    = null;
+  let cancelledTicketTypeId = null;
 
   try {
     // Use withTransaction: it will retry transient errors and commits/aborts automatically.
@@ -148,8 +181,10 @@ exports.cancelTicket = async (req, res) => {
       }
 
       // Snapshot IDs (in case event or ticketType was removed)
-      const eventId = ticket.event;
+      const eventId      = ticket.event;
       const ticketTypeId = ticket.ticketType;
+      cancelledEventId      = eventId;
+      cancelledTicketTypeId = ticketTypeId;
 
       // 2) Delete the ticket (check deletion)
       const delResult = await Ticket.deleteOne({ _id: id }).session(session);
@@ -185,7 +220,11 @@ exports.cancelTicket = async (req, res) => {
       // Optional: specify read/write concern, writeConcern: { w: 'majority' } if needed
     });
 
-    // if we reach here, transaction committed
+    // ── Notify first person on waitlist (non-blocking, outside transaction) ──
+    if (cancelledEventId && cancelledTicketTypeId) {
+      notifyWaitlist(cancelledEventId, cancelledTicketTypeId).catch(() => {});
+    }
+
     return res.status(200).json({ message: 'Ticket cancelled successfully' });
 
   } catch (err) {

@@ -20,14 +20,14 @@ const sendError = (res, status, message) =>
 // @route   POST /api/payments/order
 // @access  Private
 exports.createOrder = async (req, res) => {
-  const { eventId, ticketTypeId, quantity = 1 } = req.body;
+  const { eventId, ticketTypeId, quantity = 1, promoCode = null } = req.body;
 
   if (!eventId || !ticketTypeId) {
     return sendError(res, 400, 'eventId and ticketTypeId are required');
   }
 
   try {
-    const order = await PaymentService.createOrder(eventId, ticketTypeId, quantity);
+    const order = await PaymentService.createOrder(eventId, ticketTypeId, quantity, promoCode);
     return res.status(200).json(order);
   } catch (err) {
     console.error('createOrder error:', err);
@@ -86,6 +86,7 @@ exports.verifyPayment = async (req, res) => {
     eventId,
     ticketTypeId,
     quantity = 1,
+    promoCode = null,
   } = req.body;
   const userId = req.user && req.user.id;
 
@@ -108,6 +109,7 @@ exports.verifyPayment = async (req, res) => {
         quantity,
         userId,
         razorpayOrder: { amount: 0, amount_paid: 0 },
+        promoCode,
       });
       return res.status(200).json({ success: true, message: 'Booking Successful!', ticketIds });
     } catch (err) {
@@ -152,7 +154,7 @@ exports.verifyPayment = async (req, res) => {
   // a single session. BookingService handles abort on any failure.
   try {
     const { ticketIds } = await BookingService.createBooking({
-      orderId: order_id,
+      orderId:  order_id,
       paymentId: payment_id,
       signature: razorpay_signature,
       eventId,
@@ -160,6 +162,7 @@ exports.verifyPayment = async (req, res) => {
       quantity,
       userId,
       razorpayOrder,
+      promoCode,
     });
 
     return res.status(200).json({

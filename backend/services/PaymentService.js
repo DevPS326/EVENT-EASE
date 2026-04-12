@@ -7,8 +7,9 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 
-const Payment = require('../models/Payment');
-const Event = require('../models/Event');
+const Payment      = require('../models/Payment');
+const Event        = require('../models/Event');
+const DiscountCode = require('../models/DiscountCode');
 
 const instance = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
@@ -23,7 +24,7 @@ const instance = new Razorpay({
  *
  * @throws {Error} with .statusCode 400 | 404 on validation / not-found errors
  */
-const createOrder = async (eventId, ticketTypeId, quantity) => {
+const createOrder = async (eventId, ticketTypeId, quantity, promoCode = null) => {
   const qty = Number(quantity);
   if (!Number.isInteger(qty) || qty < 1) {
     const err = new Error('quantity must be a positive integer');
@@ -45,20 +46,39 @@ const createOrder = async (eventId, ticketTypeId, quantity) => {
     throw err;
   }
 
-  const serverAmount = ticketType.price * qty; // INR — client cannot influence this
+  const baseAmount = ticketType.price * qty; // INR — client cannot influence this
+
+  // Apply promo code if provided
+  let finalAmount = baseAmount;
+  let appliedPromoCode = null;
+
+  if (promoCode) {
+    const discount = await DiscountCode.findOne({ code: promoCode.toUpperCase().trim(), isActive: true });
+    if (discount) {
+      const validationError = discount.validate();
+      if (!validationError) {
+        // Enforce event scope
+        if (!discount.eventId || discount.eventId.toString() === eventId.toString()) {
+          finalAmount = discount.applyTo(baseAmount);
+          appliedPromoCode = discount.code;
+        }
+      }
+    }
+    // Invalid/expired/wrong-event codes are silently ignored (don't block checkout)
+  }
 
   // Free tickets bypass Razorpay entirely (minimum order is 100 paise / ₹1)
-  if (serverAmount === 0) {
-    return { id: `free_${Date.now()}`, amount: 0, currency: 'INR', isFree: true };
+  if (finalAmount === 0) {
+    return { id: `free_${Date.now()}`, amount: 0, currency: 'INR', isFree: true, promoCode: appliedPromoCode };
   }
 
   const order = await instance.orders.create({
-    amount: Math.round(serverAmount * 100), // Razorpay expects paise (integer)
+    amount: Math.round(finalAmount * 100), // Razorpay expects paise (integer)
     currency: 'INR',
     receipt: `receipt_${Date.now()}`,
   });
 
-  return order;
+  return { ...order, promoCode: appliedPromoCode, discountedAmount: finalAmount };
 };
 
 // ─── Signature Verification ──────────────────────────────────────────────────

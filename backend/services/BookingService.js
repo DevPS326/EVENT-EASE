@@ -13,10 +13,11 @@ const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 const qrcode = require('qrcode');
 
-const Payment = require('../models/Payment');
-const Ticket = require('../models/Ticket');
-const Event = require('../models/Event');
-const User = require('../models/User');
+const Payment      = require('../models/Payment');
+const Ticket       = require('../models/Ticket');
+const Event        = require('../models/Event');
+const User         = require('../models/User');
+const DiscountCode = require('../models/DiscountCode');
 const { sendEmail } = require('../utils/emailService');
 
 // ─── Idempotency ─────────────────────────────────────────────────────────────
@@ -67,6 +68,7 @@ const createBooking = async ({
   quantity,
   userId,
   razorpayOrder,
+  promoCode = null,
 }) => {
   const qty = Number(quantity);
   if (!Number.isInteger(qty) || qty < 1) {
@@ -86,7 +88,16 @@ const createBooking = async ({
 
     // ── 2. Amount validation (server-calculated vs Razorpay order) ────────
     // Confirms the Razorpay order was created with the correct price.
-    const expectedAmount = ticketType.price * qty; // INR
+    // If a promo code was applied, re-validate it here and use the discounted amount.
+    let expectedAmount = ticketType.price * qty; // INR (base)
+    if (promoCode) {
+      const discount = await DiscountCode.findOne({ code: promoCode.toUpperCase().trim(), isActive: true });
+      if (discount && !discount.validate()) {
+        if (!discount.eventId || discount.eventId.toString() === eventId.toString()) {
+          expectedAmount = discount.applyTo(expectedAmount);
+        }
+      }
+    }
     const expectedAmountPaise = Math.round(expectedAmount * 100);
 
     if (razorpayOrder.amount !== expectedAmountPaise) {
@@ -105,10 +116,11 @@ const createBooking = async ({
       orderId,
       paymentId,
       signature,
-      status: 'success',
-      user: userId,
-      event: eventId,
-      amount: expectedAmount, // server-calculated INR amount — never client-supplied
+      status:    'success',
+      user:      userId,
+      event:     eventId,
+      amount:    expectedAmount, // server-calculated INR amount (post-discount) — never client-supplied
+      promoCode: promoCode || null,
     }], { session });
 
     // ── 4. Build Ticket documents with snapshot data ───────────────────────
@@ -173,7 +185,15 @@ const createBooking = async ({
     await session.commitTransaction();
     session.endSession();
 
-    // ── 7. Send confirmation email (outside transaction, non-blocking) ────
+    // ── 7. Increment promo code usedCount (outside transaction, non-blocking) ──
+    if (promoCode) {
+      DiscountCode.findOneAndUpdate(
+        { code: promoCode.toUpperCase().trim() },
+        { $inc: { usedCount: 1 } }
+      ).catch(err => console.error('Failed to increment promo usedCount:', err));
+    }
+
+    // ── 8. Send confirmation email (outside transaction, non-blocking) ────
     sendEmail(
       user.email,
       `Your Tickets for ${event.title}`,
