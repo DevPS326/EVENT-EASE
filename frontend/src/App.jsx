@@ -11,6 +11,7 @@ import LoginPage from './pages/LoginPage/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage/RegisterPage.jsx';
 import EventDetails from './pages/EventDetails/EventDetails.jsx';
 import PolicyPage from './pages/PolicyPage/PolicyPage.jsx';
+import OAuthCallback from './pages/OAuthCallback/OAuthCallback.jsx';
 
 // User-only pages (require auth)
 import Dashboard from './pages/Dashboard/Dashboard.jsx';
@@ -38,6 +39,7 @@ function App() {
           {/* Legacy path alias */}
           <Route path="/event/:id" element={<EventDetails />} />
           <Route path="/policy" element={<PolicyPage />} />
+          <Route path="/oauth/callback" element={<OAuthCallback />} />
 
           {/* ── USER ROUTES (authenticated, any role) ──────────────────── */}
           <Route element={<ProtectedRoute />}>

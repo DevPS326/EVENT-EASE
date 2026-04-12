@@ -92,7 +92,8 @@ const createBooking = async ({
     if (razorpayOrder.amount !== expectedAmountPaise) {
       throw new Error('Payment amount does not match expected ticket price');
     }
-    if ((razorpayOrder.amount_paid || 0) < razorpayOrder.amount) {
+    // For free tickets (amount === 0) amount_paid is also 0 — skip the check
+    if (razorpayOrder.amount > 0 && (razorpayOrder.amount_paid || 0) < razorpayOrder.amount) {
       throw new Error('Payment not completed for the order');
     }
 

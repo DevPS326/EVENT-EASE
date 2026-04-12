@@ -192,7 +192,7 @@ exports.googleCallback = async (req, res) => {
         const token = generateToken(user);
 
         // Redirect to frontend
-        res.redirect(`${process.env.FRONTEND_URL}/dashboard?token=${token}`);
+        res.redirect(`${process.env.FRONTEND_URL}/oauth/callback?token=${token}`);
 
     } catch (error) {
         console.error('Google Auth Error:', error);

@@ -47,6 +47,11 @@ const createOrder = async (eventId, ticketTypeId, quantity) => {
 
   const serverAmount = ticketType.price * qty; // INR — client cannot influence this
 
+  // Free tickets bypass Razorpay entirely (minimum order is 100 paise / ₹1)
+  if (serverAmount === 0) {
+    return { id: `free_${Date.now()}`, amount: 0, currency: 'INR', isFree: true };
+  }
+
   const order = await instance.orders.create({
     amount: Math.round(serverAmount * 100), // Razorpay expects paise (integer)
     currency: 'INR',

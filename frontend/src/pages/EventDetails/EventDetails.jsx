@@ -119,6 +119,24 @@ const EventDetails = () => {
         quantity,
       });
 
+      // ── 2b. Free ticket fast-path — skip Razorpay modal entirely ─────────
+      if (orderData.isFree) {
+        try {
+          await client.post('/api/payments/verify', {
+            isFree:       true,
+            eventId:      event._id,
+            ticketTypeId: selectedTier._id,
+            quantity,
+          });
+          toast.success('Booking confirmed! Your free ticket is ready.');
+          navigate('/my-tickets');
+        } catch (freeErr) {
+          toast.error(freeErr.response?.data?.message || 'Booking failed. Please try again.');
+          setPaymentLoading(false);
+        }
+        return;
+      }
+
       // ── 3. Open Razorpay modal ────────────────────────────────────────────
       const options = {
         key:         import.meta.env.VITE_RAZORPAY_KEY_ID,
@@ -205,7 +223,9 @@ const EventDetails = () => {
   }
 
   const totalDisplay = selectedTier
-    ? `₹${(selectedTier.price * quantity).toLocaleString('en-IN')}`
+    ? selectedTier.price === 0
+      ? 'Free'
+      : `₹${(selectedTier.price * quantity).toLocaleString('en-IN')}`
     : '—';
 
   const isSoldOut = !selectedTier || selectedTier.available === 0;
@@ -337,7 +357,7 @@ const EventDetails = () => {
                             {tier.name}
                           </span>
                           <span className="text-white font-bold">
-                            ₹{tier.price.toLocaleString('en-IN')}
+                            {tier.price === 0 ? 'Free' : `₹${tier.price.toLocaleString('en-IN')}`}
                           </span>
                         </div>
                         <div className="text-xs text-slate-400">
@@ -406,6 +426,8 @@ const EventDetails = () => {
                     </>
                   ) : isSoldOut ? (
                     'Sold Out'
+                  ) : selectedTier?.price === 0 ? (
+                    '🎟 Register Free'
                   ) : (
                     '🎟 Book Now'
                   )}

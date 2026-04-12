@@ -79,6 +79,7 @@ exports.handleWebhook = async (req, res) => {
 // @access  Private
 exports.verifyPayment = async (req, res) => {
   const {
+    isFree,
     order_id,
     payment_id,
     razorpay_signature,
@@ -88,10 +89,36 @@ exports.verifyPayment = async (req, res) => {
   } = req.body;
   const userId = req.user && req.user.id;
 
-  if (!order_id || !payment_id || !razorpay_signature || !eventId || !ticketTypeId) {
+  if (!eventId || !ticketTypeId) {
     return sendError(res, 400, 'Missing required fields');
   }
   if (!userId) return sendError(res, 401, 'Unauthorized');
+
+  // ── Free ticket fast-path (no Razorpay signature or order fetch needed) ──
+  if (isFree) {
+    const freeOrderId  = `free_${Date.now()}`;
+    const freePaymentId = `free_pay_${Date.now()}`;
+    try {
+      const { ticketIds } = await BookingService.createBooking({
+        orderId:      freeOrderId,
+        paymentId:    freePaymentId,
+        signature:    'free',
+        eventId,
+        ticketTypeId,
+        quantity,
+        userId,
+        razorpayOrder: { amount: 0, amount_paid: 0 },
+      });
+      return res.status(200).json({ success: true, message: 'Booking Successful!', ticketIds });
+    } catch (err) {
+      console.error('verifyPayment (free) error:', err);
+      return sendError(res, 500, err.message || 'Server error');
+    }
+  }
+
+  if (!order_id || !payment_id || !razorpay_signature) {
+    return sendError(res, 400, 'Missing required fields');
+  }
 
   // ── 1. HMAC signature verification (pure crypto, no DB) ────────────────
   // First gate: attacker without a valid Razorpay signature gets 400 here
