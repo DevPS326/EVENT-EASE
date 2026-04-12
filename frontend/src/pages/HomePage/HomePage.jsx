@@ -1,10 +1,26 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { motion } from 'framer-motion';
+import { Search, X, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import client from '../../api/client';
-import EventCard from '../../components/EventCard/EventCard';
+import EventCard, { cardVariants } from '../../components/EventCard/EventCard';
 import useDebounce from '../../hooks/useDebounce';
 
-// ── Skeleton card matches EventCard dimensions exactly ─────────────────────────
+// ── Animation variants ─────────────────────────────────────────────────────────
+const heroVariants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.12 } },
+};
+const heroItem = {
+  hidden: { opacity: 0, y: 36 },
+  show:   { opacity: 1, y: 0, transition: { duration: 0.55, ease: 'easeOut' } },
+};
+const gridVariants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.07 } },
+};
+
+// ── Skeleton card ──────────────────────────────────────────────────────────────
 const SkeletonCard = () => (
   <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden animate-pulse">
     <div className="h-48 bg-slate-800" />
@@ -26,6 +42,12 @@ const CATEGORIES = ['Music', 'Tech', 'Workshop', 'Business', 'Art', 'Sports', 'F
 const SELECT_CLS =
   'w-full bg-slate-800/50 border border-slate-700 text-slate-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition-all appearance-none';
 
+const STATS = [
+  { value: '10,000+', label: 'Events Listed' },
+  { value: '500K+',   label: 'Tickets Sold' },
+  { value: '50+',     label: 'Cities' },
+];
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 const HomePage = () => {
   const [searchInput, setSearchInput] = useState('');
@@ -36,11 +58,10 @@ const HomePage = () => {
     sortBy: 'date',
     order: 'asc',
   });
-  const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [events, setEvents]       = useState([]);
+  const [loading, setLoading]     = useState(true);
   const [hasSearched, setHasSearched] = useState(false);
 
-  // Debounce the text search so we don't hit the API on every keystroke
   const debouncedSearch = useDebounce(searchInput, 500);
 
   const handleFilterChange = (e) => {
@@ -51,15 +72,13 @@ const HomePage = () => {
     setLoading(true);
     setHasSearched(true);
     try {
-      // Build params object — omit empty strings so the backend doesn't
-      // receive spurious empty-string filters that match nothing.
       const params = {};
-      if (debouncedSearch) params.search = debouncedSearch;
-      if (filters.category) params.category = filters.category;
+      if (debouncedSearch)   params.search    = debouncedSearch;
+      if (filters.category)  params.category  = filters.category;
       if (filters.startDate) params.startDate = filters.startDate;
-      if (filters.endDate) params.endDate = filters.endDate;
-      if (filters.sortBy) params.sortBy = filters.sortBy;
-      if (filters.order) params.order = filters.order;
+      if (filters.endDate)   params.endDate   = filters.endDate;
+      if (filters.sortBy)    params.sortBy    = filters.sortBy;
+      if (filters.order)     params.order     = filters.order;
 
       const res = await client.get('/api/events', { params });
       setEvents(Array.isArray(res.data) ? res.data : []);
@@ -71,7 +90,6 @@ const HomePage = () => {
     }
   }, [debouncedSearch, filters]);
 
-  // Re-fetch whenever debounced search text or any filter changes
   useEffect(() => {
     fetchEvents();
   }, [fetchEvents]);
@@ -89,40 +107,41 @@ const HomePage = () => {
 
       {/* ── HERO ──────────────────────────────────────────────────────────── */}
       <div className="relative overflow-hidden py-20 sm:py-28">
+        {/* Background glows */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-violet-600/20 rounded-full blur-[120px] -z-10 pointer-events-none" />
         <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-fuchsia-600/10 rounded-full blur-[100px] -z-10 pointer-events-none" />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-white mb-6">
+        <motion.div
+          variants={heroVariants}
+          initial="hidden"
+          animate="show"
+          className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10"
+        >
+          {/* Headline */}
+          <motion.h1
+            variants={heroItem}
+            className="text-5xl md:text-7xl font-bold tracking-tight text-white mb-6"
+          >
             Discover{' '}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-fuchsia-500">
               Events
             </span>{' '}
             <br className="hidden md:block" />
             That Matter.
-          </h1>
-          <p className="mt-4 text-lg text-slate-400 max-w-2xl mx-auto mb-10">
-            Book your spot at the next big concert, workshop, or meetup. Seamless booking, zero
-            hassle.
-          </p>
+          </motion.h1>
+
+          <motion.p
+            variants={heroItem}
+            className="mt-4 text-lg text-slate-400 max-w-2xl mx-auto mb-10"
+          >
+            Book your spot at the next big concert, workshop, or meetup. Seamless booking, zero hassle.
+          </motion.p>
 
           {/* Search bar */}
-          <div className="max-w-2xl mx-auto relative group">
+          <motion.div variants={heroItem} className="max-w-2xl mx-auto relative group">
             <div className="absolute -inset-1 bg-gradient-to-r from-violet-600 to-pink-600 rounded-full blur opacity-20 group-hover:opacity-40 transition duration-1000 group-hover:duration-200" />
             <div className="relative flex items-center bg-slate-900 border border-slate-700 rounded-full p-2 shadow-2xl">
-              <svg
-                className="w-5 h-5 text-slate-400 ml-4 flex-shrink-0"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
+              <Search className="w-5 h-5 text-slate-400 ml-4 flex-shrink-0" />
               <input
                 type="text"
                 value={searchInput}
@@ -136,14 +155,12 @@ const HomePage = () => {
                   className="text-slate-400 hover:text-white mr-2 transition-colors"
                   aria-label="Clear search"
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <X className="w-4 h-4" />
                 </button>
               )}
               {loading && searchInput ? (
                 <div className="w-8 h-8 flex items-center justify-center mr-1">
-                  <div className="w-4 h-4 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+                  <Loader2 className="w-4 h-4 text-violet-500 animate-spin" />
                 </div>
               ) : (
                 <button
@@ -154,8 +171,21 @@ const HomePage = () => {
                 </button>
               )}
             </div>
-          </div>
-        </div>
+          </motion.div>
+
+          {/* Stats strip */}
+          <motion.div
+            variants={heroItem}
+            className="mt-12 flex flex-wrap justify-center gap-x-10 gap-y-4"
+          >
+            {STATS.map((stat, i) => (
+              <div key={i} className="text-center">
+                <p className="text-2xl font-extrabold text-white">{stat.value}</p>
+                <p className="text-xs text-slate-500 uppercase tracking-widest mt-0.5">{stat.label}</p>
+              </div>
+            ))}
+          </motion.div>
+        </motion.div>
       </div>
 
       {/* ── FILTER BAR ────────────────────────────────────────────────────── */}
@@ -171,9 +201,7 @@ const HomePage = () => {
               <div className="relative">
                 <select name="category" value={filters.category} onChange={handleFilterChange} className={SELECT_CLS}>
                   <option value="">All Categories</option>
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
+                  {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
                 <svg className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -183,9 +211,7 @@ const HomePage = () => {
 
             {/* Date range */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                From Date
-              </label>
+              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">From Date</label>
               <input
                 type="date"
                 name="startDate"
@@ -196,9 +222,7 @@ const HomePage = () => {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                To Date
-              </label>
+              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">To Date</label>
               <input
                 type="date"
                 name="endDate"
@@ -210,9 +234,7 @@ const HomePage = () => {
 
             {/* Sort */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                Sort By
-              </label>
+              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Sort By</label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <select name="sortBy" value={filters.sortBy} onChange={handleFilterChange} className={SELECT_CLS}>
@@ -231,19 +253,15 @@ const HomePage = () => {
                 </div>
               </div>
             </div>
-
           </div>
 
-          {/* Clear filters */}
           {hasActiveFilters && (
             <div className="mt-4 flex justify-end">
               <button
                 onClick={clearFilters}
                 className="text-xs text-slate-400 hover:text-violet-400 transition-colors flex items-center gap-1"
               >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X className="w-3 h-3" />
                 Clear all filters
               </button>
             </div>
@@ -266,40 +284,33 @@ const HomePage = () => {
 
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <SkeletonCard key={i} />
-            ))}
+            {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
           </div>
         ) : events.length === 0 ? (
           <EmptyState hasFilters={hasActiveFilters} onClear={clearFilters} />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+          <motion.div
+            variants={gridVariants}
+            initial="hidden"
+            animate="show"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8"
+          >
             {events.map((event) => (
               <EventCard key={event._id} event={event} />
             ))}
-          </div>
+          </motion.div>
         )}
       </div>
     </div>
   );
 };
 
-// ── Empty State Component ──────────────────────────────────────────────────────
+// ── Empty State ────────────────────────────────────────────────────────────────
 const EmptyState = ({ hasFilters, onClear }) => (
   <div className="text-center py-24">
     <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-slate-900/70 border border-slate-800 mb-6">
-      <svg
-        className="w-10 h-10 text-slate-600"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="1.5"
-          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-        />
+      <svg className="w-10 h-10 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
       </svg>
     </div>
     <h3 className="text-xl font-semibold text-white mb-2">

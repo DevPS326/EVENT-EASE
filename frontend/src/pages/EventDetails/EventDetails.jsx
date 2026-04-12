@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import client from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
@@ -257,7 +258,12 @@ const EventDetails = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 items-start">
 
           {/* ── LEFT: Event Info ─────────────────────────────────────────── */}
-          <div className="lg:col-span-2 space-y-8">
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: 'easeOut' }}
+            className="lg:col-span-2 space-y-8"
+          >
 
             {/* Title block */}
             <div>
@@ -325,10 +331,15 @@ const EventDetails = () => {
               <h3 className="text-xl font-bold text-white mb-4">About This Event</h3>
               <p className="text-slate-300 leading-relaxed whitespace-pre-wrap">{event.description}</p>
             </div>
-          </div>
+          </motion.div>
 
           {/* ── RIGHT: Booking Card ──────────────────────────────────────── */}
-          <div className="lg:col-span-1">
+          <motion.div
+            initial={{ opacity: 0, x: 40 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.15, ease: 'easeOut' }}
+            className="lg:col-span-1"
+          >
             <div className="sticky top-24 bg-slate-900/80 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl">
               <h3 className="text-xl font-bold text-white mb-1">Get Tickets</h3>
               <p className="text-slate-500 text-sm mb-6">Select a tier to continue</p>
@@ -340,10 +351,11 @@ const EventDetails = () => {
                     const isSelected = selectedTier?._id === tier._id;
                     const soldOut    = tier.available === 0;
                     return (
-                      <button
+                      <motion.button
                         key={tier._id}
                         onClick={() => !soldOut && setSelectedTier(tier)}
                         disabled={soldOut}
+                        whileTap={!soldOut ? { scale: 0.97 } : {}}
                         className={`w-full text-left p-4 rounded-xl border transition-all duration-200 ${
                           soldOut
                             ? 'opacity-50 cursor-not-allowed bg-slate-950/30 border-slate-800'
@@ -369,7 +381,7 @@ const EventDetails = () => {
                             </span>
                           )}
                         </div>
-                      </button>
+                      </motion.button>
                     );
                   })}
                 </div>
@@ -441,7 +453,7 @@ const EventDetails = () => {
                 </p>
               </div>
             </div>
-          </div>
+          </motion.div>
 
         </div>
       </div>
