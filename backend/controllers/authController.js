@@ -14,7 +14,10 @@ const generateToken = (user) => {
 
 // reCAPTCHA verification function
 const verifyRecaptcha = async (token) => {
-    if (process.env.NODE_ENV === 'development') return true; // bypass on localhost
+    if (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {
+        console.log('[reCAPTCHA] Bypassing verification for local dev');
+        return true;
+    }
     const secretKey = process.env.RECAPTCHA_SECRET_KEY;
     const response = await axios.post(
         `https://www.google.com/recaptcha/api/siteverify?secret=${secretKey}&response=${token}`
