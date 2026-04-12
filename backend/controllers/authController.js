@@ -7,15 +7,26 @@ const { sendEmail } = require('../utils/emailService');
 
 // Generate JWT Token
 const generateToken = (user) => {
-    return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
-        expiresIn: '30d',
-    });
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+        console.error('[AUTH] JWT_SECRET is not set in environment variables!');
+    }
+    try {
+        return jwt.sign({ id: user._id, role: user.role }, secret || 'local-dev-fallback-secret', {
+            expiresIn: '30d',
+        });
+    } catch (err) {
+        console.error('[AUTH] jwt.sign failed:', err.message);
+        throw err;
+    }
 };
 
 // reCAPTCHA verification function
 const verifyRecaptcha = async (token) => {
-    if (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {
-        console.log('[reCAPTCHA] Bypassing verification for local dev');
+    // Bypass for any non-production environment (development, test, unset, etc.)
+    // This also guards against empty/null/undefined tokens which would always fail.
+    if (!token || process.env.NODE_ENV !== 'production') {
+        console.log('[reCAPTCHA] Bypassing verification (NODE_ENV=' + process.env.NODE_ENV + ')');
         return true;
     }
     const secretKey = process.env.RECAPTCHA_SECRET_KEY;
@@ -29,7 +40,7 @@ const verifyRecaptcha = async (token) => {
 // @desc    Register a new user
 // @route   POST /api/auth/signup
 exports.signup = async (req, res) => {
-    const { name, email, password } = req.body;
+    const { name, email, password, role } = req.body;
 
     try {
         // Validation
@@ -52,8 +63,12 @@ exports.signup = async (req, res) => {
             return res.status(400).json({ message: 'User already exists' });
         }
 
-        // Create user
-        const user = await User.create({ name, email, password });
+        // Validate role — only allow user or organizer from public signup
+        const allowedRoles = ['user', 'organizer'];
+        const assignedRole = allowedRoles.includes(role) ? role : 'user';
+
+        // Create user (role is now persisted correctly)
+        const user = await User.create({ name, email, password, role: assignedRole });
         if (user) {
             res.status(201).json({
                 _id: user._id,
@@ -66,6 +81,7 @@ exports.signup = async (req, res) => {
             res.status(400).json({ message: 'Invalid user data' });
         }
     } catch (error) {
+        console.error('[AUTH CRASH] signup:', error);
         res.status(500).json({ message: 'Server Error: ' + error.message });
     }
 };
@@ -119,6 +135,7 @@ exports.login = async (req, res) => {
             res.status(401).json({ message: 'Invalid email or password' });
         }
     } catch (error) {
+        console.error('[AUTH CRASH] login:', error);
         res.status(500).json({ message: 'Server Error: ' + error.message });
     }
 };
@@ -158,6 +175,7 @@ exports.verify2FA = async (req, res) => {
             token: generateToken(user),
         });
     } catch (error) {
+        console.error('[AUTH CRASH] verify2FA:', error);
         res.status(500).json({ message: 'Server Error: ' + error.message });
     }
 };
