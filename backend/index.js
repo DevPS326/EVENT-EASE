@@ -27,7 +27,14 @@ app.use(express.json({
     req.rawBody = buf;
   },
 }));
-app.use(cors()); // To enable Cross-Origin Resource Sharing
+const corsOptions = {
+  origin: 'http://localhost:5173',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+app.options('*', cors(corsOptions)); // handle preflight for all routes
+app.use(cors(corsOptions));          // apply CORS policy to all routes
 app.use(passport.initialize()); // Initialize Passport
 
 // Define API Routes
