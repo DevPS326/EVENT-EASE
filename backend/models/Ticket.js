@@ -20,6 +20,9 @@ const TicketSchema = new mongoose.Schema({
     status: { type: String, enum: ['booked', 'cancelled', 'checked-in'], default: 'booked' },
 }, { timestamps: true });
 
+// Compound index: efficient per-event attendee lookups and per-user ticket history queries
+TicketSchema.index({ event: 1, user: 1 });
+
 // Auto-generate unique Ticket ID
 TicketSchema.pre('save', function(next) {
     if (!this.ticketId) {

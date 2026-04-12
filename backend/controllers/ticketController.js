@@ -100,13 +100,10 @@ exports.cancelTicket = async (req, res) => {
         throw { status: 500, message: 'Failed to delete ticket' };
       }
 
-      // 3) Increment available for ticketType & remove attendee from event (if still exists)
+      // 3) Increment available for ticketType (attendees array removed from Event schema)
       const eventUpdateResult = await Event.updateOne(
         { _id: eventId, 'ticketTypes._id': ticketTypeId },
-        {
-          $inc: { 'ticketTypes.$.available': 1 },
-          $pull: { attendees: req.user.id }
-        }
+        { $inc: { 'ticketTypes.$.available': 1 } }
       ).session(session);
 
       // It's acceptable if matchedCount === 0 (event or ticketType removed). We just log:

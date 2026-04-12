@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const Event = require('../models/Event');
+const Ticket = require('../models/Ticket');
 const { sendEmail } = require('./emailService');
 
 const startScheduler = () => {
@@ -19,8 +20,8 @@ const startScheduler = () => {
                     $gte: now,
                     $lte: upcomingWindow,
                 },
-                reminderSent: { $ne: true } // Only if false or undefined
-            }).populate('attendees', 'email name');
+                reminderSent: { $ne: true }, // Only if false or undefined
+            });
 
             if (events.length > 0) {
                 console.log(`Found ${events.length} events starting soon.`);
@@ -28,20 +29,31 @@ const startScheduler = () => {
 
             for (const event of events) {
                 console.log(`Sending reminders for: ${event.title}`);
-                
-                // Send emails in parallel (but catch errors so one failure doesn't stop others)
-                const emailPromises = event.attendees.map(attendee => {
+
+                // Derive unique attendees from the Ticket collection.
+                // Event.attendees array removed to prevent 16MB document limit.
+                // reduce deduplicates users who hold multiple tickets for the same event.
+                const tickets = await Ticket.find({ event: event._id }).populate('user', 'name email');
+                const uniqueUsers = Object.values(
+                    tickets.reduce((acc, t) => {
+                        if (t.user) acc[t.user._id.toString()] = t.user;
+                        return acc;
+                    }, {})
+                );
+
+                // Send emails in parallel (catch per-email errors so one failure doesn't block others)
+                const emailPromises = uniqueUsers.map(user => {
                     const subject = `Reminder: '${event.title}' starts soon!`;
                     const htmlContent = `
-                        <p>Hi ${attendee.name},</p>
+                        <p>Hi ${user.name},</p>
                         <p>This is a reminder that <strong>${event.title}</strong> is starting soon.</p>
                         <p><strong>Time:</strong> ${new Date(event.date).toLocaleString()}</p>
                         <p><strong>Venue:</strong> ${event.venue}</p>
                         <p>Get your tickets ready!</p>
                         <p>Team EventEase</p>
                     `;
-                    return sendEmail(attendee.email, subject, htmlContent)
-                        .catch(err => console.error(`Failed to email ${attendee.email}:`, err.message));
+                    return sendEmail(user.email, subject, htmlContent)
+                        .catch(err => console.error(`Failed to email ${user.email}:`, err.message));
                 });
 
                 await Promise.all(emailPromises);

@@ -112,12 +112,19 @@ exports.getAllEvents = async (req, res) => {
         // 2. Build Aggregation Pipeline
         const pipeline = [
             { $match: matchStage },
-            // Add a temporary field 'attendeesCount' for sorting
-            { 
-                $addFields: { 
-                    attendeesCount: { $size: { $ifNull: ["$attendees", []] } } 
-                } 
-            }
+            // Compute attendeesCount from the Ticket collection.
+            // The Event.attendees array has been removed to prevent the 16MB document limit
+            // on large events; ticket sales are the authoritative source of attendance.
+            {
+                $lookup: {
+                    from: 'tickets',
+                    localField: '_id',
+                    foreignField: 'event',
+                    as: '_ticketSales',
+                }
+            },
+            { $addFields: { attendeesCount: { $size: '$_ticketSales' } } },
+            { $unset: '_ticketSales' }, // drop raw array immediately — keep only the count
         ];
 
         // 3. Sorting
@@ -149,7 +156,7 @@ exports.getAllEvents = async (req, res) => {
             {
                 $project: {
                     title: 1, description: 1, date: 1, venue: 1, category: 1,
-                    imageUrl: 1, ticketTypes: 1, attendees: 1, attendeesCount: 1,
+                    imageUrl: 1, ticketTypes: 1, attendeesCount: 1,
                     'organizer._id': 1, 'organizer.name': 1, 'organizer.email': 1
                 }
             }
@@ -228,8 +235,10 @@ exports.updateEvent = async (req, res) => {
 
             // Send notification if critical info changed
             if (originalDate.getTime() !== new Date(updatedEvent.date).getTime() || originalVenue !== updatedEvent.venue) {
-                const attendees = await User.find({ _id: { $in: updatedEvent.attendees } });
-                
+                // Derive attendees from the Ticket collection (attendees array removed from Event)
+                const attendeeUserIds = await Ticket.find({ event: updatedEvent._id }).distinct('user');
+                const attendees = await User.find({ _id: { $in: attendeeUserIds } }, 'name email');
+
                 await Promise.all(attendees.map(attendee => {
                     const subject = `Event Update: ${updatedEvent.title}`;
                     const htmlContent = `
@@ -278,16 +287,24 @@ exports.deleteEvent = async (req, res) => {
             return res.status(401).json({ message: 'User not authorized' });
         }
 
-        const attendees = await User.find({ _id: { $in: event.attendees } }).session(session);
-        
+        // Capture ticket IDs and unique attendee user IDs BEFORE deletion.
+        // Previously this used event.attendees (removed) and also had a bug where
+        // ticket IDs were queried AFTER Ticket.deleteMany (returning nothing).
+        const ticketsForEvent = await Ticket.find({ event: event._id }, '_id user').session(session);
+        const ticketIds = ticketsForEvent.map(t => t._id);
+        const uniqueUserIds = [...new Set(ticketsForEvent.map(t => t.user.toString()))];
+        const attendees = await User.find({ _id: { $in: uniqueUserIds } }, 'name email').session(session);
+
         // Delete related Tickets
         await Ticket.deleteMany({ event: event._id }).session(session);
 
-        // Remove event from Attendees' purchasedTickets array
-        await User.updateMany(
-            { _id: { $in: event.attendees } },
-            { $pull: { purchasedTickets: { $in: await Ticket.find({ event: event._id }).distinct('_id') } } }
-        ).session(session);
+        // Remove ticket references from users' purchasedTickets
+        if (ticketIds.length > 0) {
+            await User.updateMany(
+                { _id: { $in: uniqueUserIds } },
+                { $pull: { purchasedTickets: { $each: ticketIds } } }
+            ).session(session);
+        }
 
         await event.deleteOne({ session });
 

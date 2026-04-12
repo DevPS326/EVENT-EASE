@@ -8,8 +8,6 @@ const EventSchema = new mongoose.Schema({
     category: { type: String, required: true },
     organizer: { type: mongoose.Schema.ObjectId, ref: 'User', required: true },
     ticketPrice: { type: Number, default: 0 }, // Kept for backward compatibility
-    // attendeesCount: { type: Number, default: 0 }, // OPTIONAL: For faster sorting later
-    attendees: [{ type: mongoose.Schema.ObjectId, ref: 'User' }],
     imageUrl: { type: String, required: true },
     
     // --- NEW FIELD FOR SCHEDULER SAFETY ---
@@ -25,5 +23,9 @@ const EventSchema = new mongoose.Schema({
         },
     ],
 }, { timestamps: true });
+
+// Compound index for event discovery API: category filter + date range + price filter.
+// The spec names the field 'price'; it lives inside the ticketTypes subdocument array.
+EventSchema.index({ category: 1, date: 1, 'ticketTypes.price': 1 });
 
 module.exports = mongoose.model('Event', EventSchema);

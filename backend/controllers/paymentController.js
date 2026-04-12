@@ -216,7 +216,6 @@ exports.verifyPayment = async (req, res) => {
         'ticketTypes.available': { $gte: qty },
       },
       {
-        $push: { attendees: userId },
         $inc: { 'ticketTypes.$.available': -qty },
       },
       { new: true, session }
