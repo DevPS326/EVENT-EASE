@@ -13,13 +13,22 @@ const {
 const { protect } = require('../middleware/authMiddleware');
 const { isOrganizer } = require('../middleware/organizerMiddleware');
 
-router.route('/').get(getAllEvents);
-router.route('/create').post(protect, isOrganizer, createEvent);
-router.route('/:id').get(getEventById);
-router.route('/update/:id').put(protect, isOrganizer, updateEvent);
-router.route('/delete/:id').delete(protect, isOrganizer, deleteEvent);
-router.route('/organizer').get(protect, isOrganizer, getOrganizerEvents);
-router.route('/:id/analytics').get(protect, isOrganizer, getEventAnalytics);
-router.route('/:id/attendees/export').get(protect, isOrganizer, exportAttendeesCSV);
+// ── Static / prefixed routes FIRST (must come before /:id) ──────────────────
+router.get('/',                                             getAllEvents);
+router.post('/create',    protect, isOrganizer,            createEvent);
+
+// /organizer MUST be declared before /:id — otherwise Express catches it as a param
+router.get('/organizer',  protect, isOrganizer,            getOrganizerEvents);
+
+// ── Parameterised routes ─────────────────────────────────────────────────────
+router.get('/:id',                                         getEventById);
+router.put('/:id',        protect, isOrganizer,            updateEvent);
+router.delete('/:id',     protect, isOrganizer,            deleteEvent);
+router.get('/:id/analytics',          protect, isOrganizer, getEventAnalytics);
+router.get('/:id/attendees/export',   protect, isOrganizer, exportAttendeesCSV);
+
+// ── Legacy paths (kept for backward-compat with any existing client calls) ──
+router.put('/update/:id',    protect, isOrganizer, updateEvent);
+router.delete('/delete/:id', protect, isOrganizer, deleteEvent);
 
 module.exports = router;

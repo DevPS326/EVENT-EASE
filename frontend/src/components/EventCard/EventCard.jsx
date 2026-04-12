@@ -35,6 +35,16 @@ const EventCard = ({ event }) => {
       ? `₹${lowestPrice.toLocaleString('en-IN')}`
       : '—';
 
+  // Urgency badge — computed from all ticket types
+  const totalAvailable = event.ticketTypes?.reduce((s, t) => s + (t.available ?? 0), 0) ?? 0;
+  const totalCapacity  = event.ticketTypes?.reduce((s, t) => s + (t.quantity  ?? 0), 0) ?? 0;
+  const urgency =
+    totalCapacity > 0 && totalAvailable > 0 && totalAvailable <= 5
+      ? 'almost-gone'
+      : totalCapacity > 0 && totalAvailable > 0 && totalAvailable / totalCapacity < 0.2
+        ? 'selling-fast'
+        : null;
+
   const eventDate = new Date(event.date);
   const dateStr = eventDate.toLocaleDateString('en-IN', {
     day: 'numeric', month: 'short', year: 'numeric',
@@ -63,12 +73,20 @@ const EventCard = ({ event }) => {
         <div className="absolute top-3 right-3 bg-slate-950/80 backdrop-blur px-3 py-1 rounded-full text-xs font-semibold text-white border border-white/10">
           {categoryIcon} {event.category}
         </div>
-        {/* Free badge */}
-        {isFreeEvent && (
+        {/* Free / urgency badge — top-left */}
+        {isFreeEvent ? (
           <div className="absolute top-3 left-3 bg-emerald-500/20 backdrop-blur border border-emerald-500/40 px-3 py-1 rounded-full text-xs font-bold text-emerald-400">
             FREE
           </div>
-        )}
+        ) : urgency === 'almost-gone' ? (
+          <div className="absolute top-3 left-3 bg-red-500/20 backdrop-blur border border-red-500/40 px-3 py-1 rounded-full text-xs font-bold text-red-400 animate-pulse">
+            Almost Gone
+          </div>
+        ) : urgency === 'selling-fast' ? (
+          <div className="absolute top-3 left-3 bg-amber-500/20 backdrop-blur border border-amber-500/40 px-3 py-1 rounded-full text-xs font-bold text-amber-400">
+            Selling Fast
+          </div>
+        ) : null}
         {/* Attendees badge */}
         {typeof event.attendeesCount === 'number' && event.attendeesCount > 0 && (
           <div className="absolute bottom-3 left-3 bg-slate-950/80 backdrop-blur px-3 py-1 rounded-full text-xs text-slate-300 border border-white/10 flex items-center gap-1">

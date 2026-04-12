@@ -23,6 +23,7 @@ import CreateEvent from './components/CreateEvent/CreateEvent.jsx';
 import EventAnalytics from './pages/EventAnalytics/EventAnalytics.jsx';
 import CheckIn from './pages/CheckIn/CheckIn.jsx';
 import ManagePromoCodes from './pages/ManagePromoCodes/ManagePromoCodes.jsx';
+import EditEvent from './pages/EditEvent/EditEvent.jsx';
 import OrganizerLayout from './layouts/OrganizerLayout.jsx';
 
 function App() {
@@ -60,6 +61,7 @@ function App() {
               <Route path="/organizer/events/:id/sales" element={<EventAnalytics />} />
               <Route path="/organizer/check-in" element={<CheckIn />} />
               <Route path="/organizer/promo-codes" element={<ManagePromoCodes />} />
+              <Route path="/organizer/events/:id/edit" element={<EditEvent />} />
               {/* Legacy analytics path */}
               <Route path="/event/:id/analytics" element={<EventAnalytics />} />
             </Route>

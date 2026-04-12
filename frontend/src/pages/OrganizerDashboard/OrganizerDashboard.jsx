@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { BarChart2, Edit2, Trash2, Eye, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import client from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
@@ -12,9 +14,6 @@ const OrganizerDashboard = () => {
   const fetchEvents = useCallback(async () => {
     setLoading(true);
     try {
-      // GET /api/events/organizer — returns events for the logged-in organizer.
-      // NOTE: this endpoint uses Event.find() (no aggregation), so attendeesCount
-      // is NOT included. Per-event sales data lives in /api/events/:id/analytics.
       const res = await client.get('/api/events/organizer');
       setEvents(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
@@ -26,9 +25,24 @@ const OrganizerDashboard = () => {
 
   useEffect(() => { fetchEvents(); }, [fetchEvents]);
 
+  const handleDelete = async (eventId) => {
+    try {
+      await client.delete(`/api/events/${eventId}`);
+      setEvents((prev) => prev.filter((e) => e._id !== eventId));
+      toast.success('Event deleted.');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete event.');
+    }
+  };
+
   const now = new Date();
   const upcomingCount = events.filter((e) => new Date(e.date) > now).length;
   const totalTiers    = events.reduce((acc, e) => acc + (e.ticketTypes?.length || 0), 0);
+  const totalSold     = events.reduce((acc, e) => {
+    const cap  = e.ticketTypes?.reduce((s, t) => s + (t.quantity  || 0), 0) || 0;
+    const avail= e.ticketTypes?.reduce((s, t) => s + (t.available || 0), 0) || 0;
+    return acc + (cap - avail);
+  }, 0);
 
   return (
     <div className="pt-10 pb-16 px-4 sm:px-6 lg:px-8">
@@ -55,29 +69,15 @@ const OrganizerDashboard = () => {
           </Link>
         </div>
 
-        {/* ── STATS OVERVIEW ────────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-12">
-          <StatCard
-            label="Total Events"
-            value={loading ? '—' : events.length}
-            icon="📅"
-            color="violet"
-          />
-          <StatCard
-            label="Upcoming Events"
-            value={loading ? '—' : upcomingCount}
-            icon="🚀"
-            color="fuchsia"
-          />
-          <StatCard
-            label="Total Ticket Tiers"
-            value={loading ? '—' : totalTiers}
-            icon="🎟"
-            color="emerald"
-          />
+        {/* Stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-12">
+          <StatCard label="Total Events"    value={loading ? '—' : events.length}  icon="📅" color="violet"  />
+          <StatCard label="Upcoming"        value={loading ? '—' : upcomingCount}   icon="🚀" color="fuchsia" />
+          <StatCard label="Tickets Sold"    value={loading ? '—' : totalSold}       icon="🎟" color="emerald" />
+          <StatCard label="Ticket Tiers"    value={loading ? '—' : totalTiers}      icon="🏷" color="sky"     />
         </div>
 
-        {/* ── YOUR EVENTS ───────────────────────────────────────────────── */}
+        {/* Your Events */}
         <h2 className="text-xl font-bold text-white mb-5">Your Events</h2>
 
         {loading ? (
@@ -102,7 +102,7 @@ const OrganizerDashboard = () => {
         ) : (
           <div className="space-y-4">
             {events.map((event) => (
-              <EventRow key={event._id} event={event} />
+              <EventRow key={event._id} event={event} onDelete={handleDelete} />
             ))}
           </div>
         )}
@@ -117,31 +117,42 @@ const COLOR_MAP = {
   violet:  'text-violet-400',
   fuchsia: 'text-fuchsia-400',
   emerald: 'text-emerald-400',
+  sky:     'text-sky-400',
 };
 
 const StatCard = ({ label, value, icon, color }) => (
-  <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl hover:border-slate-700 transition-colors">
-    <div className="flex items-center justify-between mb-3">
-      <p className="text-slate-400 text-sm font-medium">{label}</p>
-      <span className="text-xl">{icon}</span>
+  <div className="bg-slate-900/50 border border-slate-800 p-5 rounded-2xl hover:border-slate-700 transition-colors">
+    <div className="flex items-center justify-between mb-2">
+      <p className="text-slate-400 text-xs font-medium uppercase tracking-wide">{label}</p>
+      <span className="text-lg">{icon}</span>
     </div>
-    <p className={`text-4xl font-bold ${COLOR_MAP[color] || 'text-white'}`}>{value}</p>
+    <p className={`text-3xl font-bold ${COLOR_MAP[color] || 'text-white'}`}>{value}</p>
   </div>
 );
 
 // ── Event Row ──────────────────────────────────────────────────────────────────
-const EventRow = ({ event }) => {
-  const [imgErr, setImgErr] = useState(false);
+const EventRow = ({ event, onDelete }) => {
+  const [imgErr,       setImgErr]       = useState(false);
+  const [confirmOpen,  setConfirmOpen]  = useState(false);
+  const [deleting,     setDeleting]     = useState(false);
   const FALLBACK = 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=400&q=80';
   const isPast = new Date(event.date) < new Date();
 
-  // Total capacity from ticketTypes (attendees array has been removed from schema)
-  const totalCapacity = event.ticketTypes?.reduce((acc, t) => acc + (t.quantity || 0), 0) || 0;
+  const totalCapacity  = event.ticketTypes?.reduce((acc, t) => acc + (t.quantity  || 0), 0) || 0;
   const totalAvailable = event.ticketTypes?.reduce((acc, t) => acc + (t.available || 0), 0) || 0;
-  const soldCount = totalCapacity - totalAvailable;
+  const soldCount      = totalCapacity - totalAvailable;
+  const soldPct        = totalCapacity > 0 ? Math.round((soldCount / totalCapacity) * 100) : 0;
+
+  const handleConfirmDelete = async () => {
+    setDeleting(true);
+    await onDelete(event._id);
+    setDeleting(false);
+    setConfirmOpen(false);
+  };
 
   return (
-    <div className={`bg-slate-900/60 border rounded-xl flex flex-col md:flex-row items-start md:items-center gap-5 p-5 hover:border-violet-500/30 transition-colors ${isPast ? 'border-slate-800 opacity-60' : 'border-slate-800'}`}>
+    <div className={`bg-slate-900/60 border rounded-xl flex flex-col md:flex-row items-start md:items-center gap-5 p-5 hover:border-violet-500/30 transition-colors ${isPast ? 'border-slate-800 opacity-70' : 'border-slate-800'}`}>
+
       {/* Image */}
       <img
         src={imgErr ? FALLBACK : (event.imageUrl || FALLBACK)}
@@ -155,52 +166,125 @@ const EventRow = ({ event }) => {
         <div className="flex items-center gap-2 mb-0.5">
           <h3 className="text-base font-bold text-white truncate">{event.title}</h3>
           {isPast && (
-            <span className="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full flex-shrink-0">
-              Past
-            </span>
+            <span className="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full flex-shrink-0">Past</span>
           )}
         </div>
         <p className="text-sm text-slate-400">
           {new Date(event.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-          {' · '}
-          {event.venue}
+          {' · '}{event.venue}
         </p>
-        {/* Ticket tier pills */}
         <div className="flex flex-wrap gap-1.5 mt-2">
           {event.ticketTypes?.map((t) => (
             <span key={t._id} className="text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full">
-              {t.name} · ₹{t.price.toLocaleString('en-IN')}
+              {t.name} · {t.price === 0 ? 'Free' : `₹${t.price.toLocaleString('en-IN')}`}
             </span>
           ))}
         </div>
       </div>
 
-      {/* Sold count pill */}
-      <div className="bg-slate-950 border border-slate-800 px-4 py-2 rounded-lg text-center flex-shrink-0">
-        <p className="text-violet-400 font-bold text-lg">{soldCount}</p>
-        <p className="text-slate-500 text-xs">
-          sold / {totalCapacity}
-        </p>
+      {/* Sold progress */}
+      <div className="flex-shrink-0 w-28 hidden lg:block">
+        <div className="flex justify-between text-xs text-slate-400 mb-1">
+          <span>{soldCount} sold</span>
+          <span>{soldPct}%</span>
+        </div>
+        <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all ${
+              soldPct >= 90 ? 'bg-red-500' : soldPct >= 70 ? 'bg-amber-500' : 'bg-violet-500'
+            }`}
+            style={{ width: `${soldPct}%` }}
+          />
+        </div>
+        <p className="text-xs text-slate-600 mt-1 text-right">{totalCapacity} total</p>
       </div>
 
       {/* Actions */}
-      <div className="flex gap-2 flex-shrink-0">
+      <div className="flex items-center gap-2 flex-shrink-0">
         <Link
           to={`/organizer/events/${event._id}/sales`}
-          className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5"
+          title="Analytics"
+          className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors"
         >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
-          Analytics
+          <BarChart2 className="w-4 h-4" />
         </Link>
         <Link
           to={`/events/${event._id}`}
-          className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          title="View public page"
+          className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors"
         >
-          View
+          <Eye className="w-4 h-4" />
         </Link>
+        <Link
+          to={`/organizer/events/${event._id}/edit`}
+          title="Edit event"
+          className="p-2 bg-slate-800 hover:bg-violet-600 text-slate-300 hover:text-white rounded-lg transition-colors"
+        >
+          <Edit2 className="w-4 h-4" />
+        </Link>
+        <button
+          onClick={() => setConfirmOpen(true)}
+          title="Delete event"
+          className="p-2 bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-400 rounded-lg transition-colors"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
       </div>
+
+      {/* Delete confirm dialog */}
+      <AnimatePresence>
+        {confirmOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !deleting && setConfirmOpen(false)}
+              className="fixed inset-0 bg-black/60 z-50"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+              className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-sm bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-red-500/15 flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="text-white font-bold">Delete Event?</h3>
+                  <p className="text-slate-400 text-sm">This will delete all tickets and send cancellation emails to attendees.</p>
+                </div>
+              </div>
+              <p className="text-sm text-slate-300 bg-slate-800 rounded-xl px-4 py-2 mb-5 truncate">
+                {event.title}
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirmOpen(false)}
+                  disabled={deleting}
+                  className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-sm transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmDelete}
+                  disabled={deleting}
+                  className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white font-semibold text-sm transition-colors flex items-center justify-center gap-2"
+                >
+                  {deleting ? (
+                    <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    'Delete'
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

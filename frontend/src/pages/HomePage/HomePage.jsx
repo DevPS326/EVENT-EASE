@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Search, X, Loader2 } from 'lucide-react';
+import { Search, X, Loader2, SlidersHorizontal } from 'lucide-react';
 import toast from 'react-hot-toast';
 import client from '../../api/client';
 import EventCard, { cardVariants } from '../../components/EventCard/EventCard';
@@ -39,8 +39,36 @@ const SkeletonCard = () => (
 );
 
 const CATEGORIES = ['Music', 'Tech', 'Workshop', 'Business', 'Art', 'Sports', 'Food'];
+const CATEGORY_ICONS = { Music: '🎵', Tech: '💻', Workshop: '🛠', Business: '💼', Art: '🎨', Sports: '⚽', Food: '🍕' };
+
 const SELECT_CLS =
   'w-full bg-slate-800/50 border border-slate-700 text-slate-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition-all appearance-none';
+
+// Date preset helper
+const getDatePreset = (preset) => {
+  const now  = new Date();
+  const pad  = (n) => String(n).padStart(2, '0');
+  const fmt  = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+  if (preset === 'today') {
+    return { startDate: fmt(now), endDate: fmt(now) };
+  }
+  if (preset === 'weekend') {
+    const day = now.getDay();
+    const sat = new Date(now); sat.setDate(now.getDate() + ((6 - day + 7) % 7 || 7));
+    const sun = new Date(sat); sun.setDate(sat.getDate() + 1);
+    return { startDate: fmt(sat), endDate: fmt(sun) };
+  }
+  if (preset === 'week') {
+    const end = new Date(now); end.setDate(now.getDate() + 7);
+    return { startDate: fmt(now), endDate: fmt(end) };
+  }
+  if (preset === 'month') {
+    const end = new Date(now); end.setMonth(now.getMonth() + 1);
+    return { startDate: fmt(now), endDate: fmt(end) };
+  }
+  return { startDate: '', endDate: '' };
+};
 
 const STATS = [
   { value: '10,000+', label: 'Events Listed' },
@@ -58,6 +86,9 @@ const HomePage = () => {
     sortBy: 'date',
     order: 'asc',
   });
+  const [priceFilter,   setPriceFilter]   = useState('');      // '' | 'free' | 'paid'
+  const [activePreset,  setActivePreset]  = useState('');      // '' | 'today' | 'weekend' | 'week' | 'month'
+  const [advancedOpen,  setAdvancedOpen]  = useState(false);
   const [events, setEvents]       = useState([]);
   const [loading, setLoading]     = useState(true);
   const [hasSearched, setHasSearched] = useState(false);
@@ -66,6 +97,17 @@ const HomePage = () => {
 
   const handleFilterChange = (e) => {
     setFilters((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handleDatePreset = (preset) => {
+    if (activePreset === preset) {
+      setActivePreset('');
+      setFilters((prev) => ({ ...prev, startDate: '', endDate: '' }));
+    } else {
+      setActivePreset(preset);
+      const { startDate, endDate } = getDatePreset(preset);
+      setFilters((prev) => ({ ...prev, startDate, endDate }));
+    }
   };
 
   const fetchEvents = useCallback(async () => {
@@ -79,6 +121,8 @@ const HomePage = () => {
       if (filters.endDate)   params.endDate   = filters.endDate;
       if (filters.sortBy)    params.sortBy    = filters.sortBy;
       if (filters.order)     params.order     = filters.order;
+      if (priceFilter === 'free') { params.minPrice = 0; params.maxPrice = 0; }
+      if (priceFilter === 'paid') { params.minPrice = 1; }
 
       const res = await client.get('/api/events', { params });
       setEvents(Array.isArray(res.data) ? res.data : []);
@@ -88,7 +132,7 @@ const HomePage = () => {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, filters]);
+  }, [debouncedSearch, filters, priceFilter]);
 
   useEffect(() => {
     fetchEvents();
@@ -97,10 +141,12 @@ const HomePage = () => {
   const clearFilters = () => {
     setSearchInput('');
     setFilters({ category: '', startDate: '', endDate: '', sortBy: 'date', order: 'asc' });
+    setPriceFilter('');
+    setActivePreset('');
   };
 
   const hasActiveFilters =
-    searchInput || filters.category || filters.startDate || filters.endDate;
+    searchInput || filters.category || filters.startDate || filters.endDate || priceFilter;
 
   return (
     <div className="min-h-screen bg-slate-950 pt-20">
@@ -190,77 +236,137 @@ const HomePage = () => {
 
       {/* ── FILTER BAR ────────────────────────────────────────────────────── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-20 mb-12">
-        <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-5 shadow-xl">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+        <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-5 shadow-xl space-y-4">
 
-            {/* Category */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                Category
-              </label>
-              <div className="relative">
-                <select name="category" value={filters.category} onChange={handleFilterChange} className={SELECT_CLS}>
-                  <option value="">All Categories</option>
-                  {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-                <svg className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
-
-            {/* Date range */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">From Date</label>
-              <input
-                type="date"
-                name="startDate"
-                value={filters.startDate}
-                onChange={handleFilterChange}
-                className="bg-slate-800/50 border border-slate-700 text-slate-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-violet-500 outline-none text-sm [color-scheme:dark] transition-all"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">To Date</label>
-              <input
-                type="date"
-                name="endDate"
-                value={filters.endDate}
-                onChange={handleFilterChange}
-                className="bg-slate-800/50 border border-slate-700 text-slate-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-violet-500 outline-none text-sm [color-scheme:dark] transition-all"
-              />
-            </div>
-
-            {/* Sort */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Sort By</label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <select name="sortBy" value={filters.sortBy} onChange={handleFilterChange} className={SELECT_CLS}>
-                    <option value="date">Date</option>
-                    <option value="popularity">Popularity</option>
-                  </select>
-                  <svg className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-                <div className="relative flex-shrink-0">
-                  <select name="order" value={filters.order} onChange={handleFilterChange} className={`${SELECT_CLS} w-20`}>
-                    <option value="asc">↑ Asc</option>
-                    <option value="desc">↓ Desc</option>
-                  </select>
-                </div>
-              </div>
+          {/* Row 1: Category pills */}
+          <div>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2.5">Category</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setFilters((p) => ({ ...p, category: '' }))}
+                className={`px-4 py-1.5 rounded-full text-sm font-semibold border transition-all ${
+                  !filters.category
+                    ? 'bg-violet-600 border-violet-600 text-white shadow-lg shadow-violet-500/20'
+                    : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:border-slate-500'
+                }`}
+              >
+                All
+              </button>
+              {CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() =>
+                    setFilters((p) => ({ ...p, category: p.category === cat ? '' : cat }))
+                  }
+                  className={`px-4 py-1.5 rounded-full text-sm font-semibold border transition-all ${
+                    filters.category === cat
+                      ? 'bg-violet-600 border-violet-600 text-white shadow-lg shadow-violet-500/20'
+                      : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:border-slate-500'
+                  }`}
+                >
+                  {CATEGORY_ICONS[cat]} {cat}
+                </button>
+              ))}
             </div>
           </div>
 
+          {/* Row 2: Date presets + Price toggle + Advanced toggle */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap gap-2">
+              {[
+                { key: 'today',   label: 'Today' },
+                { key: 'weekend', label: 'This Weekend' },
+                { key: 'week',    label: 'This Week' },
+                { key: 'month',   label: 'This Month' },
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => handleDatePreset(key)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                    activePreset === key
+                      ? 'bg-fuchsia-600 border-fuchsia-600 text-white'
+                      : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-200'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="w-px h-5 bg-slate-700 hidden sm:block" />
+
+            {/* Price pills */}
+            <div className="flex gap-2">
+              {[
+                { key: 'free', label: '🎁 Free' },
+                { key: 'paid', label: '💳 Paid' },
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setPriceFilter((p) => (p === key ? '' : key))}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                    priceFilter === key
+                      ? key === 'free'
+                        ? 'bg-emerald-600 border-emerald-600 text-white'
+                        : 'bg-sky-600 border-sky-600 text-white'
+                      : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-200'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setAdvancedOpen((v) => !v)}
+              className="ml-auto flex items-center gap-1.5 text-xs text-slate-400 hover:text-violet-400 transition-colors"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              {advancedOpen ? 'Hide' : 'More'} filters
+            </button>
+          </div>
+
+          {/* Advanced: date range + sort (collapsible) */}
+          {advancedOpen && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end pt-2 border-t border-slate-800">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">From Date</label>
+                <input type="date" name="startDate" value={filters.startDate} onChange={handleFilterChange}
+                  className="bg-slate-800/50 border border-slate-700 text-slate-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-violet-500 outline-none text-sm [color-scheme:dark] transition-all"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">To Date</label>
+                <input type="date" name="endDate" value={filters.endDate} onChange={handleFilterChange}
+                  className="bg-slate-800/50 border border-slate-700 text-slate-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-violet-500 outline-none text-sm [color-scheme:dark] transition-all"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5 lg:col-span-2">
+                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Sort By</label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <select name="sortBy" value={filters.sortBy} onChange={handleFilterChange} className={SELECT_CLS}>
+                      <option value="date">Date</option>
+                      <option value="popularity">Popularity</option>
+                    </select>
+                    <svg className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                  <div className="relative flex-shrink-0">
+                    <select name="order" value={filters.order} onChange={handleFilterChange} className={`${SELECT_CLS} w-20`}>
+                      <option value="asc">↑ Asc</option>
+                      <option value="desc">↓ Desc</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {hasActiveFilters && (
-            <div className="mt-4 flex justify-end">
-              <button
-                onClick={clearFilters}
-                className="text-xs text-slate-400 hover:text-violet-400 transition-colors flex items-center gap-1"
-              >
+            <div className="flex justify-end border-t border-slate-800 pt-3">
+              <button onClick={clearFilters} className="text-xs text-slate-400 hover:text-violet-400 transition-colors flex items-center gap-1">
                 <X className="w-3 h-3" />
                 Clear all filters
               </button>

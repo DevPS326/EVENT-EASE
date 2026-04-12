@@ -226,7 +226,12 @@ exports.updateEvent = async (req, res) => {
                     if (isNaN(price) || price < 0) throw new Error(`Invalid price for tier ${index + 1}`);
                     if (isNaN(quantity) || quantity < 1) throw new Error(`Invalid quantity for tier ${index + 1}`);
 
-                    return { name, price, quantity, available: quantity };
+                    // Preserve sold count: available = new quantity minus already-sold tickets
+                    const existing   = event.ticketTypes.find(t => t.name === name);
+                    const soldCount  = existing ? Math.max(0, (existing.quantity || 0) - (existing.available || 0)) : 0;
+                    const available  = Math.max(0, quantity - soldCount);
+
+                    return { name, price, quantity, available };
                 });
                 event.ticketTypes = validated;
             }
