@@ -10,6 +10,7 @@ const {
     getEventAnalytics,
     exportAttendeesCSV
 } = require('../controllers/eventController');
+const { getEventReviews } = require('../controllers/reviewController');
 const { protect } = require('../middleware/authMiddleware');
 const { isOrganizer } = require('../middleware/organizerMiddleware');
 
@@ -24,6 +25,7 @@ router.get('/organizer',  protect, isOrganizer,            getOrganizerEvents);
 router.get('/:id',                                         getEventById);
 router.put('/:id',        protect, isOrganizer,            updateEvent);
 router.delete('/:id',     protect, isOrganizer,            deleteEvent);
+router.get('/:id/reviews',                                   getEventReviews);
 router.get('/:id/analytics',          protect, isOrganizer, getEventAnalytics);
 router.get('/:id/attendees/export',   protect, isOrganizer, exportAttendeesCSV);
 

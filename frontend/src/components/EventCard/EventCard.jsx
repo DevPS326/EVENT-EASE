@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MapPin, Users } from 'lucide-react';
+import ShareButton from '../ShareButton/ShareButton';
 
 const FALLBACK_IMG = 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&q=80';
 
@@ -72,6 +73,10 @@ const EventCard = ({ event }) => {
         {/* Category badge */}
         <div className="absolute top-3 right-3 bg-slate-950/80 backdrop-blur px-3 py-1 rounded-full text-xs font-semibold text-white border border-white/10">
           {categoryIcon} {event.category}
+        </div>
+        {/* Share button — visible on hover */}
+        <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <ShareButton eventId={event._id} eventTitle={event.title} compact />
         </div>
         {/* Free / urgency badge — top-left */}
         {isFreeEvent ? (

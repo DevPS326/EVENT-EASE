@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Tag, ChevronDown, ChevronUp, X, Check, Clock } from 'lucide-react';
+import { Tag, ChevronDown, ChevronUp, X, Check, Clock, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
 import client from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import ShareButton from '../../components/ShareButton/ShareButton';
 
 const FALLBACK_IMG = 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&q=80';
 
@@ -55,6 +56,17 @@ const EventDetails = () => {
   const [quantity, setQuantity]             = useState(1);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [imgError, setImgError]             = useState(false);
+
+  // Reviews state
+  const [reviews, setReviews]           = useState([]);
+  const [reviewSummary, setReviewSummary] = useState({ avgRating: 0, totalReviews: 0, ratingBreakdown: { 5:0,4:0,3:0,2:0,1:0 } });
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [myRating, setMyRating]         = useState(0);
+  const [hoverRating, setHoverRating]   = useState(0);
+  const [myComment, setMyComment]       = useState('');
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [myReviewId, setMyReviewId]     = useState(null); // existing review _id
+  const reviewsRef = useRef(null);
 
   // Promo code state
   const [promoOpen, setPromoOpen]       = useState(false);
@@ -119,6 +131,58 @@ const EventDetails = () => {
   useEffect(() => {
     setAppliedPromo(null);
   }, [quantity]);
+
+  // Fetch reviews once event is loaded
+  useEffect(() => {
+    if (!id) return;
+    const fetchReviews = async () => {
+      setReviewsLoading(true);
+      try {
+        const res = await client.get(`/api/events/${id}/reviews`);
+        setReviews(res.data.reviews || []);
+        setReviewSummary({
+          avgRating:       res.data.avgRating       || 0,
+          totalReviews:    res.data.totalReviews     || 0,
+          ratingBreakdown: res.data.ratingBreakdown  || { 5:0,4:0,3:0,2:0,1:0 },
+        });
+        // Pre-fill own review if exists
+        const own = (res.data.reviews || []).find((r) => r.isOwn);
+        if (own) { setMyRating(own.rating); setMyComment(own.comment || ''); setMyReviewId(own._id); }
+      } catch { /* non-critical */ }
+      finally { setReviewsLoading(false); }
+    };
+    fetchReviews();
+  }, [id]);
+
+  // Scroll to reviews section when URL has #reviews
+  useEffect(() => {
+    if (window.location.hash === '#reviews' && reviewsRef.current) {
+      setTimeout(() => reviewsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 400);
+    }
+  }, [reviews]);
+
+  // ── Submit review ─────────────────────────────────────────────────────────────
+  const handleSubmitReview = async () => {
+    if (myRating === 0) { toast.error('Please select a star rating.'); return; }
+    setReviewSubmitting(true);
+    try {
+      const res = await client.post('/api/reviews', { eventId: id, rating: myRating, comment: myComment });
+      toast.success(myReviewId ? 'Review updated!' : 'Review submitted!');
+      setMyReviewId(res.data.review._id);
+      setReviewSummary({ avgRating: res.data.avgRating, totalReviews: res.data.totalReviews, ratingBreakdown: res.data.ratingBreakdown });
+      // Optimistic: upsert review in list
+      setReviews((prev) => {
+        const updated = { ...res.data.review, user: { name: 'You' }, isOwn: true };
+        const idx = prev.findIndex((r) => r.isOwn);
+        if (idx >= 0) { const next = [...prev]; next[idx] = updated; return next; }
+        return [updated, ...prev];
+      });
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to submit review.');
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
 
   // ── Apply promo code ─────────────────────────────────────────────────────────
   const handleApplyPromo = async () => {
@@ -375,9 +439,12 @@ const EventDetails = () => {
 
             {/* Title block */}
             <div>
-              <span className="inline-block px-3 py-1 bg-violet-600/20 text-violet-400 rounded-full text-sm font-semibold mb-4 border border-violet-600/30">
-                {event.category}
-              </span>
+              <div className="flex items-center justify-between gap-4 mb-4">
+                <span className="inline-block px-3 py-1 bg-violet-600/20 text-violet-400 rounded-full text-sm font-semibold border border-violet-600/30">
+                  {event.category}
+                </span>
+                <ShareButton eventId={event._id} eventTitle={event.title} />
+              </div>
               <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-5 leading-tight">
                 {event.title}
               </h1>
@@ -438,6 +505,138 @@ const EventDetails = () => {
             <div className="bg-slate-900/50 border border-white/5 rounded-2xl p-8">
               <h3 className="text-xl font-bold text-white mb-4">About This Event</h3>
               <p className="text-slate-300 leading-relaxed whitespace-pre-wrap">{event.description}</p>
+            </div>
+
+            {/* ── Reviews ────────────────────────────────────────────────── */}
+            <div id="reviews" ref={reviewsRef} className="bg-slate-900/50 border border-white/5 rounded-2xl p-8">
+              <h3 className="text-xl font-bold text-white mb-6">
+                Reviews
+                {reviewSummary.totalReviews > 0 && (
+                  <span className="ml-3 text-base font-normal text-slate-400">
+                    ({reviewSummary.totalReviews})
+                  </span>
+                )}
+              </h3>
+
+              {/* Rating summary */}
+              {reviewSummary.totalReviews > 0 && (
+                <div className="flex flex-col sm:flex-row gap-6 mb-8 pb-8 border-b border-slate-800">
+                  {/* Big avg */}
+                  <div className="flex flex-col items-center justify-center bg-slate-950/50 rounded-2xl px-8 py-4 flex-shrink-0">
+                    <span className="text-5xl font-extrabold text-white">{reviewSummary.avgRating}</span>
+                    <StarRow rating={reviewSummary.avgRating} size="sm" />
+                    <span className="text-slate-500 text-xs mt-1">{reviewSummary.totalReviews} review{reviewSummary.totalReviews !== 1 ? 's' : ''}</span>
+                  </div>
+                  {/* Breakdown bars */}
+                  <div className="flex-1 space-y-2">
+                    {[5,4,3,2,1].map((star) => {
+                      const count = reviewSummary.ratingBreakdown[star] || 0;
+                      const pct   = reviewSummary.totalReviews > 0 ? Math.round((count / reviewSummary.totalReviews) * 100) : 0;
+                      return (
+                        <div key={star} className="flex items-center gap-3">
+                          <span className="text-xs text-slate-400 w-4 text-right">{star}</span>
+                          <Star className="w-3 h-3 text-amber-400 fill-amber-400 flex-shrink-0" />
+                          <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-amber-400 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-xs text-slate-500 w-6 text-right">{count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Write a review (past event + authenticated) */}
+              {isAuthenticated && event.date && new Date(event.date) < new Date() && (
+                <div className="mb-8 bg-slate-950/40 border border-slate-800 rounded-xl p-5">
+                  <p className="text-sm font-semibold text-slate-300 mb-3">
+                    {myReviewId ? 'Update your review' : 'Leave a review'}
+                  </p>
+                  {/* Star picker */}
+                  <div className="flex gap-1 mb-3">
+                    {[1,2,3,4,5].map((s) => (
+                      <button
+                        key={s}
+                        onMouseEnter={() => setHoverRating(s)}
+                        onMouseLeave={() => setHoverRating(0)}
+                        onClick={() => setMyRating(s)}
+                        className="transition-transform hover:scale-110"
+                        aria-label={`Rate ${s} star${s>1?'s':''}`}
+                      >
+                        <Star
+                          className={`w-7 h-7 transition-colors ${
+                            s <= (hoverRating || myRating)
+                              ? 'text-amber-400 fill-amber-400'
+                              : 'text-slate-600'
+                          }`}
+                        />
+                      </button>
+                    ))}
+                    {myRating > 0 && (
+                      <span className="text-slate-400 text-sm self-center ml-2">
+                        {['','Terrible','Poor','Okay','Good','Excellent'][myRating]}
+                      </span>
+                    )}
+                  </div>
+                  <textarea
+                    value={myComment}
+                    onChange={(e) => setMyComment(e.target.value)}
+                    maxLength={500}
+                    rows={3}
+                    placeholder="Share your experience (optional)…"
+                    className="w-full bg-slate-900 border border-slate-700 focus:border-violet-500 text-white text-sm px-4 py-3 rounded-xl outline-none resize-none transition-colors placeholder:text-slate-600 mb-3"
+                  />
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-600">{myComment.length}/500</span>
+                    <button
+                      onClick={handleSubmitReview}
+                      disabled={reviewSubmitting || myRating === 0}
+                      className="px-5 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-colors flex items-center gap-2"
+                    >
+                      {reviewSubmitting ? (
+                        <div className="w-3.5 h-3.5 border-2 border-white/50 border-t-white rounded-full animate-spin" />
+                      ) : null}
+                      {myReviewId ? 'Update' : 'Submit'} Review
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Review list */}
+              {reviewsLoading ? (
+                <div className="flex justify-center py-8">
+                  <div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : reviews.length === 0 ? (
+                <p className="text-slate-500 text-sm text-center py-6">
+                  {new Date(event.date) >= new Date()
+                    ? 'Reviews will be available after the event.'
+                    : 'No reviews yet. Be the first!'}
+                </p>
+              ) : (
+                <div className="space-y-5">
+                  {reviews.map((r) => (
+                    <div key={r._id} className={`flex gap-4 ${r.isOwn ? 'bg-violet-600/5 border border-violet-600/10 rounded-xl p-4 -mx-2' : ''}`}>
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center flex-shrink-0 text-white font-bold text-sm">
+                        {(r.user?.name || '?').charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-semibold text-white">
+                            {r.isOwn ? 'You' : r.user?.name || 'Attendee'}
+                          </span>
+                          <StarRow rating={r.rating} size="xs" />
+                          <span className="text-xs text-slate-600 ml-auto">
+                            {new Date(r.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}
+                          </span>
+                        </div>
+                        {r.comment && <p className="text-slate-300 text-sm leading-relaxed">{r.comment}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </motion.div>
 
@@ -673,6 +872,21 @@ const EventDetails = () => {
 
         </div>
       </div>
+    </div>
+  );
+};
+
+// ── Star row helper ───────────────────────────────────────────────────────────
+const StarRow = ({ rating, size = 'sm' }) => {
+  const sz = size === 'xs' ? 'w-3 h-3' : 'w-4 h-4';
+  return (
+    <div className="flex gap-0.5">
+      {[1,2,3,4,5].map((s) => (
+        <Star
+          key={s}
+          className={`${sz} ${s <= Math.round(rating) ? 'text-amber-400 fill-amber-400' : 'text-slate-700'}`}
+        />
+      ))}
     </div>
   );
 };
