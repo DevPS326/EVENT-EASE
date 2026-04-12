@@ -99,6 +99,49 @@ const EventDetails = () => {
     fetchEvent();
   }, [id]);
 
+  // ── Dynamic SEO meta tags ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!event) return;
+
+    const prev = {
+      title: document.title,
+      desc:  document.querySelector('meta[name="description"]')?.getAttribute('content') || '',
+    };
+
+    document.title = `${event.title} — EventEase`;
+
+    const setMeta = (sel, attr, val) => {
+      let el = document.querySelector(sel);
+      if (!el) { el = document.createElement('meta'); document.head.appendChild(el); }
+      el.setAttribute(attr, val);
+    };
+
+    const desc = event.description
+      ? event.description.slice(0, 160)
+      : `Join us for ${event.title} at ${event.venue || 'an amazing venue'}!`;
+    const img  = (!imgError && event.imageUrl) ? event.imageUrl : FALLBACK_IMG;
+    const url  = window.location.href;
+
+    setMeta('meta[name="description"]',         'name',    'description');
+    setMeta('meta[name="description"]',         'content', desc);
+    setMeta('meta[property="og:title"]',        'property','og:title');
+    setMeta('meta[property="og:title"]',        'content', `${event.title} — EventEase`);
+    setMeta('meta[property="og:description"]',  'property','og:description');
+    setMeta('meta[property="og:description"]',  'content', desc);
+    setMeta('meta[property="og:image"]',        'property','og:image');
+    setMeta('meta[property="og:image"]',        'content', img);
+    setMeta('meta[property="og:url"]',          'property','og:url');
+    setMeta('meta[property="og:url"]',          'content', url);
+    setMeta('meta[property="og:type"]',         'property','og:type');
+    setMeta('meta[property="og:type"]',         'content', 'event');
+
+    return () => {
+      document.title = prev.title;
+      const descEl = document.querySelector('meta[name="description"]');
+      if (descEl) descEl.setAttribute('content', prev.desc);
+    };
+  }, [event, imgError]);
+
   // ── Fetch waitlist positions for sold-out tiers (auth only) ─────────────────
   useEffect(() => {
     if (!event || !isAuthenticated) return;

@@ -38,7 +38,8 @@ app.use('/api/tickets',   require('./routes/ticketRoutes'));
 app.use('/api/users',     require('./routes/userRoutes'));
 app.use('/api/promo',     require('./routes/promoRoutes'));
 app.use('/api/waitlist',  require('./routes/waitlistRoutes'));
-app.use('/api/reviews',   require('./routes/reviewRoutes'));
+app.use('/api/reviews',        require('./routes/reviewRoutes'));
+app.use('/api/notifications',  require('./routes/notificationRoutes'));
 
 // A simple test route
 app.get('/', (req, res) => {

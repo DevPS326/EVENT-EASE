@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { Ticket, CalendarCheck, Star, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import client from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
@@ -22,6 +23,20 @@ const Profile = () => {
   const { user, login, token } = useAuth();
   const [editing, setEditing]   = useState(false);
   const [saving, setSaving]     = useState(false);
+  const [stats, setStats]       = useState(null);
+
+  // Fetch stats from tickets endpoint
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const { data } = await client.get('/api/tickets/my');
+        const upcoming = (data.upcomingEvents || []).length;
+        const past     = (data.pastBookings   || []).length;
+        setStats({ upcoming, past, total: upcoming + past });
+      } catch { /* non-critical */ }
+    };
+    load();
+  }, []);
 
   const {
     register,
@@ -162,6 +177,39 @@ const Profile = () => {
               )}
             </div>
           </div>
+        </div>
+
+        {/* ── Stats strip ────────────────────────────────────────────── */}
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          {[
+            {
+              icon: <Ticket className="w-5 h-5" />,
+              label: 'Total Tickets',
+              value: stats ? stats.total : '—',
+              color: 'text-violet-400',
+            },
+            {
+              icon: <CalendarCheck className="w-5 h-5" />,
+              label: 'Events Attended',
+              value: stats ? stats.past : '—',
+              color: 'text-emerald-400',
+            },
+            {
+              icon: <Clock className="w-5 h-5" />,
+              label: 'Upcoming',
+              value: stats ? stats.upcoming : '—',
+              color: 'text-fuchsia-400',
+            },
+          ].map(({ icon, label, value, color }) => (
+            <div
+              key={label}
+              className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 text-center hover:border-slate-700 transition-colors"
+            >
+              <div className={`flex justify-center mb-2 ${color}`}>{icon}</div>
+              <p className={`text-2xl font-bold ${color}`}>{value}</p>
+              <p className="text-slate-500 text-xs mt-0.5">{label}</p>
+            </div>
+          ))}
         </div>
 
         {/* ── Account Settings ───────────────────────────────────────── */}

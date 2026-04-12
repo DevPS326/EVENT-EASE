@@ -18,6 +18,7 @@ const Ticket       = require('../models/Ticket');
 const Event        = require('../models/Event');
 const User         = require('../models/User');
 const DiscountCode = require('../models/DiscountCode');
+const Notification = require('../models/Notification');
 const { sendEmail } = require('../utils/emailService');
 
 // ─── Idempotency ─────────────────────────────────────────────────────────────
@@ -193,7 +194,16 @@ const createBooking = async ({
       ).catch(err => console.error('Failed to increment promo usedCount:', err));
     }
 
-    // ── 8. Send confirmation email (outside transaction, non-blocking) ────
+    // ── 8. In-app booking notification (outside transaction, non-blocking) ─
+    Notification.create({
+      user:    userId,
+      type:    'booking_confirmed',
+      title:   `Booking Confirmed — ${event.title}`,
+      message: `Your ${qty} ticket${qty > 1 ? 's' : ''} for ${event.title} are confirmed! Check your email for QR codes.`,
+      link:    `/my-tickets`,
+    }).catch(err => console.error('Failed to create booking notification:', err));
+
+    // ── 9. Send confirmation email (outside transaction, non-blocking) ────
     sendEmail(
       user.email,
       `Your Tickets for ${event.title}`,

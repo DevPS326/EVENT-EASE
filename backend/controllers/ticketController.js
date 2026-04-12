@@ -1,8 +1,9 @@
 const mongoose = require('mongoose');
-const Ticket   = require('../models/Ticket');
-const Event    = require('../models/Event');
-const User     = require('../models/User');
-const Waitlist = require('../models/Waitlist');
+const Ticket       = require('../models/Ticket');
+const Event        = require('../models/Event');
+const User         = require('../models/User');
+const Waitlist     = require('../models/Waitlist');
+const Notification = require('../models/Notification');
 const { sendEmail } = require('../utils/emailService');
 
 /**
@@ -143,6 +144,15 @@ async function notifyWaitlist(eventId, ticketTypeId) {
   entry.status     = 'notified';
   entry.notifiedAt = new Date();
   await entry.save();
+
+  // In-app notification alongside the email (non-blocking)
+  Notification.create({
+    user:    entry.user._id,
+    type:    'waitlist_spot',
+    title:   `Spot Available — ${eventTitle}`,
+    message: `A ticket for ${eventTitle} just opened up. Book now before it's gone!`,
+    link:    `/events/${eventId}`,
+  }).catch(() => {});
 }
 
 /**

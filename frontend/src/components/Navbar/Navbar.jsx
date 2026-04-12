@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import NotificationBell from '../NotificationBell/NotificationBell';
 
 const Navbar = () => {
   const { user, isAuthenticated, isOrganizer, logout } = useAuth();
@@ -52,7 +53,8 @@ const Navbar = () => {
             <NavLink to="/policy">Policy</NavLink>
 
             {isAuthenticated ? (
-              <div className="flex items-center gap-4 ml-4 pl-4 border-l border-slate-800">
+              <div className="flex items-center gap-3 ml-4 pl-4 border-l border-slate-800">
+                <NotificationBell />
                 <Link
                   to="/profile"
                   className="text-slate-300 hover:text-white font-medium transition-colors text-sm"
@@ -89,7 +91,8 @@ const Navbar = () => {
           </div>
 
           {/* MOBILE MENU BUTTON */}
-          <div className="md:hidden flex items-center">
+          <div className="md:hidden flex items-center gap-2">
+            {isAuthenticated && <NotificationBell />}
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="text-slate-300 hover:text-white p-2 transition-colors"
