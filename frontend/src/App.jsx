@@ -21,6 +21,8 @@ import Profile from './pages/Profile/Profile.jsx';
 import OrganizerDashboard from './pages/OrganizerDashboard/OrganizerDashboard.jsx';
 import CreateEvent from './components/CreateEvent/CreateEvent.jsx';
 import EventAnalytics from './pages/EventAnalytics/EventAnalytics.jsx';
+import CheckIn from './pages/CheckIn/CheckIn.jsx';
+import OrganizerLayout from './layouts/OrganizerLayout.jsx';
 
 function App() {
   return (
@@ -50,12 +52,15 @@ function App() {
 
           {/* ── ORGANIZER ROUTES (authenticated + organizer/admin role) ── */}
           <Route element={<OrganizerRoute />}>
-            <Route path="/organizer/dashboard" element={<OrganizerDashboard />} />
-            <Route path="/organizer/create-event" element={<CreateEvent />} />
-            <Route path="/create-event" element={<CreateEvent />} />
-            <Route path="/organizer/events/:id/sales" element={<EventAnalytics />} />
-            {/* Legacy analytics path */}
-            <Route path="/event/:id/analytics" element={<EventAnalytics />} />
+            <Route element={<OrganizerLayout />}>
+              <Route path="/organizer/dashboard" element={<OrganizerDashboard />} />
+              <Route path="/organizer/create-event" element={<CreateEvent />} />
+              <Route path="/create-event" element={<CreateEvent />} />
+              <Route path="/organizer/events/:id/sales" element={<EventAnalytics />} />
+              <Route path="/organizer/check-in" element={<CheckIn />} />
+              {/* Legacy analytics path */}
+              <Route path="/event/:id/analytics" element={<EventAnalytics />} />
+            </Route>
           </Route>
 
           {/* ── CATCH-ALL ──────────────────────────────────────────────── */}

@@ -4,6 +4,63 @@ const Event = require('../models/Event');
 const User = require('../models/User');
 
 /**
+ * @desc  Check in a ticket by its string ticketId (the TKT-... value in the QR)
+ * @route PATCH /api/tickets/:ticketId/checkin
+ * @access Private — organizer only (organizerMiddleware applied in route)
+ */
+exports.checkInTicket = async (req, res) => {
+  const { ticketId } = req.params;
+
+  try {
+    const ticket = await Ticket.findOne({ ticketId }).populate('event', 'organizer title');
+    if (!ticket) {
+      return res.status(404).json({ success: false, message: 'Ticket not found' });
+    }
+
+    // Verify the calling organizer owns this event
+    const eventOrganizerId = ticket.event?.organizer?.toString?.() || ticket.event?.organizer;
+    if (eventOrganizerId !== req.user.id && eventOrganizerId !== req.user._id?.toString()) {
+      return res.status(403).json({ success: false, message: 'You do not manage this event' });
+    }
+
+    if (ticket.status === 'checked-in') {
+      return res.status(200).json({
+        success: true,
+        alreadyCheckedIn: true,
+        checkedInAt: ticket.checkedInAt,
+        ticket: {
+          ticketId: ticket.ticketId,
+          ticketTypeName: ticket.ticketTypeName,
+          eventTitle: ticket.event?.title || ticket.eventTitleSnapshot,
+        },
+      });
+    }
+
+    if (ticket.status === 'cancelled') {
+      return res.status(400).json({ success: false, message: 'Ticket has been cancelled' });
+    }
+
+    ticket.status = 'checked-in';
+    ticket.checkedInAt = new Date();
+    await ticket.save();
+
+    return res.status(200).json({
+      success: true,
+      alreadyCheckedIn: false,
+      checkedInAt: ticket.checkedInAt,
+      ticket: {
+        ticketId: ticket.ticketId,
+        ticketTypeName: ticket.ticketTypeName,
+        eventTitle: ticket.event?.title || ticket.eventTitleSnapshot,
+      },
+    });
+  } catch (err) {
+    console.error('checkInTicket error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+/**
  * @desc Get all tickets for logged-in user
  * @route GET /api/tickets/my
  */

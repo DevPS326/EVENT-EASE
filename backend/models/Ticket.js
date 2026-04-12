@@ -16,8 +16,9 @@ const TicketSchema = new mongoose.Schema({
     // ----------------------------------------------
 
     ticketId: { type: String, unique: true },
-    qrCode: { type: String }, 
+    qrCode: { type: String },
     status: { type: String, enum: ['booked', 'cancelled', 'checked-in'], default: 'booked' },
+    checkedInAt: { type: Date },
 }, { timestamps: true });
 
 // Compound index: efficient per-event attendee lookups and per-user ticket history queries

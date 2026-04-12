@@ -31,8 +31,8 @@ const OrganizerDashboard = () => {
   const totalTiers    = events.reduce((acc, e) => acc + (e.ticketTypes?.length || 0), 0);
 
   return (
-    <div className="min-h-screen bg-slate-950 pt-24 pb-16 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="pt-10 pb-16 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-5xl mx-auto">
 
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
