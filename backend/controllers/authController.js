@@ -164,14 +164,28 @@ exports.verify2FA = async (req, res) => {
 // @route   GET /api/auth/google/callback
 exports.googleCallback = async (req, res) => {
     try {
-        // req.user contains the Google profile from passport strategy
+        // req.user is populated by Passport after successful Google authentication
         const profile = req.user;
-        const email = profile.emails[0].value;
-        const name = profile.displayName;
+
+        if (!profile) {
+            console.log('[googleCallback] ERROR: req.user is undefined — Passport did not populate the profile.');
+            return res.redirect('http://localhost:5173/login?error=auth_failed');
+        }
+
+        const email    = profile.emails?.[0]?.value;
+        const name     = profile.displayName;
         const googleId = profile.id;
+
+        console.log('[googleCallback] Google profile received:', { email, name, googleId });
+
+        if (!email) {
+            console.log('[googleCallback] ERROR: No email returned from Google profile.');
+            return res.redirect('http://localhost:5173/login?error=auth_failed');
+        }
 
         // Check if user exists in DB
         let user = await User.findOne({ email });
+        console.log('[googleCallback] DB lookup result:', user ? `found user ${user._id}` : 'new user — will create');
 
         if (user) {
             // Link googleId if not already present
@@ -185,19 +199,23 @@ exports.googleCallback = async (req, res) => {
                 name,
                 email,
                 googleId,
-                role: 'user' // Default role
+                role: 'user',
             });
+            console.log('[googleCallback] New user created:', user._id);
         }
 
         // Generate token using the Database User object (contains _id and role)
         const token = generateToken(user);
+        console.log('[googleCallback] Token generated — redirecting to frontend callback route.');
 
-        // Redirect to frontend
-        res.redirect(`${process.env.FRONTEND_URL}/oauth/callback?token=${token}`);
+        // Redirect to frontend OAuth landing page
+        res.redirect('http://localhost:5173/auth/google/callback?token=' + token);
 
     } catch (error) {
-        console.error('Google Auth Error:', error);
-        // Redirect to login with error
-        res.redirect(`${process.env.FRONTEND_URL}/login?error=auth_failed`);
+        console.log('[googleCallback] UNHANDLED ERROR:');
+        console.log('  message :', error.message);
+        console.log('  stack   :', error.stack);
+        console.log('  req.user:', req.user);
+        res.redirect('http://localhost:5173/login?error=auth_failed');
     }
 };

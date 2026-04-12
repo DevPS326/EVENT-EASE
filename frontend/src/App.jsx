@@ -44,6 +44,7 @@ function App() {
           <Route path="/event/:id" element={<EventDetails />} />
           <Route path="/policy" element={<PolicyPage />} />
           <Route path="/oauth/callback" element={<OAuthCallback />} />
+          <Route path="/auth/google/callback" element={<OAuthCallback />} />
 
           {/* ── USER ROUTES (authenticated, any role) ──────────────────── */}
           <Route element={<ProtectedRoute />}>
