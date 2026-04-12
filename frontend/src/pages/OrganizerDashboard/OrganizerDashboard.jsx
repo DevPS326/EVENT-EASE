@@ -36,13 +36,13 @@ const OrganizerDashboard = () => {
   };
 
   const now = new Date();
-  const upcomingCount = events.filter((e) => new Date(e.date) > now).length;
-  const totalTiers    = events.reduce((acc, e) => acc + (e.ticketTypes?.length || 0), 0);
-  const totalSold     = events.reduce((acc, e) => {
+  const upcomingCount = events?.filter((e) => new Date(e.date) > now).length ?? 0;
+  const totalTiers    = events?.reduce((acc, e) => acc + (e.ticketTypes?.length || 0), 0) ?? 0;
+  const totalSold     = events?.reduce((acc, e) => {
     const cap  = e.ticketTypes?.reduce((s, t) => s + (t.quantity  || 0), 0) || 0;
     const avail= e.ticketTypes?.reduce((s, t) => s + (t.available || 0), 0) || 0;
     return acc + (cap - avail);
-  }, 0);
+  }, 0) ?? 0;
 
   return (
     <div className="pt-10 pb-16 px-4 sm:px-6 lg:px-8">
@@ -101,7 +101,7 @@ const OrganizerDashboard = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {events.map((event) => (
+            {events?.map((event) => (
               <EventRow key={event._id} event={event} onDelete={handleDelete} />
             ))}
           </div>

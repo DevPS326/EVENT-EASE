@@ -43,10 +43,10 @@ const Navbar = () => {
           <div className="hidden md:flex items-center space-x-8">
             <NavLink to="/">Events</NavLink>
 
-            {isAuthenticated && isOrganizer && (
-              <NavLink to="/organizer/dashboard">My Events</NavLink>
+            {isAuthenticated && user?.role === 'organizer' && (
+              <NavLink to="/organizer/dashboard">Organizer Portal</NavLink>
             )}
-            {isAuthenticated && !isOrganizer && (
+            {isAuthenticated && user?.role !== 'organizer' && (
               <NavLink to="/my-tickets">My Tickets</NavLink>
             )}
 
@@ -128,10 +128,10 @@ const Navbar = () => {
             <div className="px-4 pt-2 pb-4 space-y-1">
               <MobileNavLink to="/" onClick={closeMenu}>Events</MobileNavLink>
 
-              {isAuthenticated && isOrganizer && (
-                <MobileNavLink to="/organizer/dashboard" onClick={closeMenu}>My Events</MobileNavLink>
+              {isAuthenticated && user?.role === 'organizer' && (
+                <MobileNavLink to="/organizer/dashboard" onClick={closeMenu}>Organizer Portal</MobileNavLink>
               )}
-              {isAuthenticated && !isOrganizer && (
+              {isAuthenticated && user?.role !== 'organizer' && (
                 <MobileNavLink to="/my-tickets" onClick={closeMenu}>My Tickets</MobileNavLink>
               )}
 
