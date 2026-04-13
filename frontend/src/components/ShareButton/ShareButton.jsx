@@ -27,7 +27,7 @@ const ShareButton = ({ eventId, eventTitle, compact = false }) => {
   const text = encodeURIComponent(`Check out "${eventTitle}" on EventEase! 🎟`);
   const encodedUrl = encodeURIComponent(url);
 
-  // Close on outside click
+  // Close on outside click (only relevant when popover is shown)
   useEffect(() => {
     if (!open) return;
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
@@ -40,7 +40,27 @@ const ShareButton = ({ eventId, eventTitle, compact = false }) => {
       setCopied(true);
       toast.success('Link copied to clipboard!');
       setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {
+      toast.error('Could not copy link.');
     });
+  };
+
+  // Primary button handler: use Web Share API when available (mobile),
+  // otherwise fall back to the popover (desktop).
+  const handleButtonClick = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: eventTitle,
+          text:  `Check out "${eventTitle}" on EventEase!`,
+          url,
+        });
+      } catch {
+        // user cancelled the share sheet — no-op
+      }
+    } else {
+      setOpen((v) => !v);
+    }
   };
 
   const SHARE_LINKS = [
@@ -62,7 +82,7 @@ const ShareButton = ({ eventId, eventTitle, compact = false }) => {
     <div ref={ref} className="relative">
       <motion.button
         whileTap={{ scale: 0.93 }}
-        onClick={() => setOpen((v) => !v)}
+        onClick={handleButtonClick}
         className={
           compact
             ? 'flex items-center justify-center w-8 h-8 rounded-full bg-slate-950/70 backdrop-blur border border-white/10 text-white/70 hover:text-white transition-colors'
