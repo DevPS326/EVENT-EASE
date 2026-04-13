@@ -1,0 +1,268 @@
+[
+  {
+    "title": "Srijan 2025 — Annual Cultural Extravaganza",
+    "description": "ISM's largest cultural festival returns with 4 days of music, dance, drama, and art. Headlined by national artists, Srijan 2025 draws 10,000+ students from across India. Compete in 30+ events or just soak in the vibe — this is the cultural heartbeat of campus.",
+    "category": "Music",
+    "club": "Cultural Council, IIT ISM",
+    "venue": "Main Ground, IIT ISM Dhanbad",
+    "imageUrl": "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&q=80",
+    "relativeDaysFromNow": 14,
+    "isFeatured": true,
+    "tiers": [
+      { "name": "Day Pass", "price": 199, "quantity": 800 },
+      { "name": "All-Access Pass", "price": 599, "quantity": 200 }
+    ]
+  },
+  {
+    "title": "Concetto 2025 — Technical Symposium",
+    "description": "IIT ISM's flagship technical festival — 48 hours of hackathons, robotics wars, drone racing, paper presentations, and expert talks from industry leaders at Google, ISRO, and L&T. 500+ teams from 120 colleges compete for ₹5L in prizes.",
+    "category": "Tech",
+    "club": "Technical Council, IIT ISM",
+    "venue": "Seminar Complex, IIT ISM Dhanbad",
+    "imageUrl": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&q=80",
+    "relativeDaysFromNow": 21,
+    "isFeatured": true,
+    "tiers": [
+      { "name": "Student Pass", "price": 99, "quantity": 500 },
+      { "name": "Pro Pass + Kit", "price": 299, "quantity": 100 }
+    ]
+  },
+  {
+    "title": "KHANAN — Mining & Earth Sciences Fest",
+    "description": "Exclusively for mining, petroleum, and applied geology students — KHANAN brings together core-branch companies, alumni from ONGC, Coal India, and Vedanta for talks, technical quizzes, and plant visit opportunities. The most impactful fest for placements.",
+    "category": "Tech",
+    "club": "Mining Engineering Association",
+    "venue": "Mining Department Auditorium, IIT ISM",
+    "imageUrl": "https://images.unsplash.com/photo-1581093458791-9d42e3c2fd14?w=800&q=80",
+    "relativeDaysFromNow": 10,
+    "isFeatured": true,
+    "tiers": [
+      { "name": "Core Entry", "price": 0, "quantity": 300 }
+    ]
+  },
+  {
+    "title": "Parakram — Inter-Hostel Sports Championship",
+    "description": "12 hostels. 18 sports. 1 champion. Parakram is ISM's most fiercely contested annual sports event — from cricket to swimming to chess. Every point matters. Every game is a battle. Which hostel will lift the trophy this year?",
+    "category": "Sports",
+    "club": "Sports Council, IIT ISM",
+    "venue": "Sports Complex, IIT ISM Dhanbad",
+    "imageUrl": "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=800&q=80",
+    "relativeDaysFromNow": 7,
+    "isFeatured": true,
+    "tiers": [
+      { "name": "Spectator Pass", "price": 0, "quantity": 1000 }
+    ]
+  },
+  {
+    "title": "HackFest ISM — 36-Hour Hackathon",
+    "description": "Build anything in 36 hours. HackFest ISM brings together coders, designers, and product thinkers to solve real problems in Ed-Tech, FinTech, and Smart Mining. Mentors from top startups, cloud credits, and ₹2L in prizes. 500 participants, 100+ teams.",
+    "category": "Tech",
+    "club": "Coding Club ISM",
+    "venue": "CS Department & Main Atrium, IIT ISM",
+    "imageUrl": "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800&q=80",
+    "relativeDaysFromNow": 18,
+    "isFeatured": true,
+    "tiers": [
+      { "name": "Participant (per team of 3)", "price": 149, "quantity": 120 },
+      { "name": "Solo Hacker", "price": 99, "quantity": 60 }
+    ]
+  },
+  {
+    "title": "CP Masterclass — Dynamic Programming Deep Dive",
+    "description": "Coding Club ISM presents a 3-hour intensive session on Dynamic Programming with problems from Codeforces Div 1. Led by 4 red-rated competitive programmers from ISM. Walk in as a beginner, walk out solving hard DP problems.",
+    "category": "Workshop",
+    "club": "Coding Club ISM",
+    "venue": "LT-1, CS Department, IIT ISM",
+    "imageUrl": "https://images.unsplash.com/photo-1555949963-ff9fe0c870eb?w=800&q=80",
+    "relativeDaysFromNow": 4,
+    "isFeatured": false,
+    "tiers": [
+      { "name": "Free Registration", "price": 0, "quantity": 80 }
+    ]
+  },
+  {
+    "title": "Data Science Bootcamp — ML for Real Problems",
+    "description": "DSTC presents a 2-day bootcamp on applied machine learning — from data cleaning to model deployment. Work on real datasets: earthquake prediction, energy consumption, and ore grade estimation. Certificates provided. Limited to 60 seats.",
+    "category": "Workshop",
+    "club": "DSTC — Data Science & Tech Club",
+    "venue": "Electronics Lab 2, IIT ISM Dhanbad",
+    "imageUrl": "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80",
+    "relativeDaysFromNow": 9,
+    "isFeatured": false,
+    "tiers": [
+      { "name": "Standard Seat", "price": 199, "quantity": 60 }
+    ]
+  },
+  {
+    "title": "IoT Hackathon — Smart Campus Challenge",
+    "description": "IoT Club ISM challenges you to build a working smart-campus prototype in 24 hours using Arduino, Raspberry Pi, and sensors provided on-site. Best project gets funded by the Institute Innovation Council. Win hardware kits, IoT certifications, and startup mentorship.",
+    "category": "Tech",
+    "club": "IoT Club ISM",
+    "venue": "Workshop Shed, Mechanical Block, IIT ISM",
+    "imageUrl": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&q=80",
+    "relativeDaysFromNow": 12,
+    "isFeatured": false,
+    "tiers": [
+      { "name": "Team Entry (max 3)", "price": 99, "quantity": 50 }
+    ]
+  },
+  {
+    "title": "Manthan — Open Mic & Acoustic Night",
+    "description": "Manthan Music Club hosts its monthly open mic under the stars. Bring your guitar, your poetry, or just your voice. No judgement. No competition. Just music, chai, and the best nights at ISM. Performers and listeners both welcome.",
+    "category": "Music",
+    "club": "Manthan Music Club",
+    "venue": "Open Air Theatre, IIT ISM Dhanbad",
+    "imageUrl": "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&q=80",
+    "relativeDaysFromNow": 3,
+    "isFeatured": false,
+    "tiers": [
+      { "name": "Open Entry", "price": 0, "quantity": 200 }
+    ]
+  },
+  {
+    "title": "Naatak — Annual Drama Production by Abhay",
+    "description": "Abhay Dramatics presents their annual full-length play — a 90-minute original production written, directed, and performed entirely by ISM students. This year's theme: 'The Weight of a Degree'. Expect tears, laughs, and a standing ovation.",
+    "category": "Art",
+    "club": "Abhay Dramatics",
+    "venue": "Convocation Hall, IIT ISM Dhanbad",
+    "imageUrl": "https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?w=800&q=80",
+    "relativeDaysFromNow": 16,
+    "isFeatured": false,
+    "tiers": [
+      { "name": "Reserved Seat", "price": 49, "quantity": 300 },
+      { "name": "VIP Front Row", "price": 129, "quantity": 50 }
+    ]
+  },
+  {
+    "title": "Vox Populi — Annual Debate Championship",
+    "description": "Literary Club ISM's flagship debate tournament. 60 teams across 4 formats: British Parliamentary, Asian Parliamentary, MUN, and Elocution. Open to all UG and PG students. Grand prize: ₹15,000 + certificate. Registration deadline: 3 days before event.",
+    "category": "Workshop",
+    "club": "Literary Club ISM",
+    "venue": "Senate Hall, IIT ISM Dhanbad",
+    "imageUrl": "https://images.unsplash.com/photo-1577896851231-70ef18881754?w=800&q=80",
+    "relativeDaysFromNow": 11,
+    "isFeatured": false,
+    "tiers": [
+      { "name": "Team Registration (2)", "price": 79, "quantity": 60 }
+    ]
+  },
+  {
+    "title": "E-Summit ISM — Entrepreneurship & Innovation Summit",
+    "description": "Entrepreneurship Cell ISM brings together 20+ startup founders, VC investors, and IIT alumni for a full day of talks, panels, and the flagship startup pitching competition. Network, learn, pitch, and win up to ₹1L in seed funding.",
+    "category": "Business",
+    "club": "Entrepreneurship Cell ISM",
+    "venue": "Main Auditorium, IIT ISM Dhanbad",
+    "imageUrl": "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=800&q=80",
+    "relativeDaysFromNow": 25,
+    "isFeatured": true,
+    "tiers": [
+      { "name": "Delegate Pass", "price": 99, "quantity": 400 },
+      { "name": "Startup Pitcher Slot", "price": 199, "quantity": 30 }
+    ]
+  },
+  {
+    "title": "Mining Conclave — Industry Expert Masterclass",
+    "description": "Senior engineers from Coal India, ONGC, and Hindalco speak on current challenges in sustainable mining, automation, and career paths in the core sector. Q&A session + networking dinner. This is the kind of event that changes placements.",
+    "category": "Business",
+    "club": "Mining Engineering Association",
+    "venue": "Mining Dept Seminar Room, IIT ISM",
+    "imageUrl": "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=800&q=80",
+    "relativeDaysFromNow": 6,
+    "isFeatured": false,
+    "tiers": [
+      { "name": "Open to All", "price": 0, "quantity": 120 }
+    ]
+  },
+  {
+    "title": "Lens & Light — Campus Photography Exhibition",
+    "description": "Photography Club ISM presents 80+ prints shot entirely on campus — from foggy winter mornings at the clock tower to late-night study sessions in the hostel corridors. Submit your best 3 shots by the deadline. Public exhibition open to all.",
+    "category": "Art",
+    "club": "Photography Club ISM",
+    "venue": "Gallery Space, Students' Activity Centre, ISM",
+    "imageUrl": "https://images.unsplash.com/photo-1452587925148-ce544e77e70d?w=800&q=80",
+    "relativeDaysFromNow": 8,
+    "isFeatured": false,
+    "tiers": [
+      { "name": "Free Entry", "price": 0, "quantity": 500 }
+    ]
+  },
+  {
+    "title": "Roborace — Line Follower & Maze Solver Championship",
+    "description": "Robotics Club ISM's most popular event. Build a bot that navigates a maze faster than everyone else's. Hardware workshop 2 days before the competition. Prizes for fastest time, most elegant design, and best crash of the day.",
+    "category": "Tech",
+    "club": "Robotics Club ISM",
+    "venue": "Mechanical Workshop, IIT ISM Dhanbad",
+    "imageUrl": "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800&q=80",
+    "relativeDaysFromNow": 13,
+    "isFeatured": false,
+    "tiers": [
+      { "name": "Per Bot Entry", "price": 99, "quantity": 40 }
+    ]
+  },
+  {
+    "title": "Stock Market Simulation — Bull vs Bear",
+    "description": "Finance Club ISM simulates a live 4-hour stock market with real-time events, shocks, and insider leaks. Trade, strategise, and emerge with the highest portfolio value. Past winners have gone on to trading desks at HDFC Securities and Zerodha.",
+    "category": "Business",
+    "club": "Finance & Investment Club ISM",
+    "venue": "Computer Lab A, IIT ISM Dhanbad",
+    "imageUrl": "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&q=80",
+    "relativeDaysFromNow": 5,
+    "isFeatured": false,
+    "tiers": [
+      { "name": "Participant Seat", "price": 49, "quantity": 80 }
+    ]
+  },
+  {
+    "title": "Gyaan — All-India Inter-IIT Quiz",
+    "description": "Quiz Club ISM hosts the most gruelling quiz on campus — science, current affairs, sports, music, pop culture. 10 rounds. 4-member teams. 90-minute knockout format. Participation from 15+ IITs, ISM, NITs. Champion team takes ₹20,000 and eternal bragging rights.",
+    "category": "Workshop",
+    "club": "Quiz Club ISM",
+    "venue": "Seminar Hall 2, IIT ISM Dhanbad",
+    "imageUrl": "https://images.unsplash.com/photo-1606326608606-aa0b62935f2b?w=800&q=80",
+    "relativeDaysFromNow": 20,
+    "isFeatured": false,
+    "tiers": [
+      { "name": "Team of 4", "price": 79, "quantity": 50 }
+    ]
+  },
+  {
+    "title": "Nritya — Annual Classical & Contemporary Dance Show",
+    "description": "Dance Club ISM's annual production brings together Bharatanatyam, Kathak, hip-hop, and contemporary forms in a single 2-hour showcase. 80 performers, 10 choreographies, 1 unforgettable evening. Book early — this sells out every year.",
+    "category": "Art",
+    "club": "Dance Club ISM",
+    "venue": "Convocation Hall, IIT ISM Dhanbad",
+    "imageUrl": "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=800&q=80",
+    "relativeDaysFromNow": 22,
+    "isFeatured": false,
+    "tiers": [
+      { "name": "General Seating", "price": 49, "quantity": 250 },
+      { "name": "Premium Seating", "price": 99, "quantity": 80 }
+    ]
+  },
+  {
+    "title": "NSS Blood Donation Drive — Save a Life",
+    "description": "NSS IIT ISM partners with Patliputra Blood Bank for the semester's largest blood donation drive. Voluntary participation. Juice, snacks, and donor certificates provided. Every unit donated can save up to 3 lives. Last drive collected 312 units.",
+    "category": "Workshop",
+    "club": "NSS Unit, IIT ISM",
+    "venue": "Students' Activity Centre Lawn, IIT ISM",
+    "imageUrl": "https://images.unsplash.com/photo-1615461066841-6116e61058f4?w=800&q=80",
+    "relativeDaysFromNow": 2,
+    "isFeatured": false,
+    "tiers": [
+      { "name": "Volunteer", "price": 0, "quantity": 400 }
+    ]
+  },
+  {
+    "title": "Stargazing Night — Astronomy Club ISM",
+    "description": "Escape the hostel and spend a night under the Milky Way. Astronomy Club ISM sets up 8 telescopes on the football ground. Expert guide-through of Jupiter's moons, the Orion Nebula, and Saturn's rings. Chai and stargazing — the best combo.",
+    "category": "Workshop",
+    "club": "Astronomy Club ISM",
+    "venue": "Football Ground, IIT ISM Dhanbad",
+    "imageUrl": "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?w=800&q=80",
+    "relativeDaysFromNow": 1,
+    "isFeatured": false,
+    "tiers": [
+      { "name": "Free Entry", "price": 0, "quantity": 150 }
+    ]
+  }
+]
