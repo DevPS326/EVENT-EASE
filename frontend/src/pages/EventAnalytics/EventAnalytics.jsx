@@ -46,10 +46,32 @@ const EventAnalytics = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center pt-20">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-slate-400 text-sm">Loading analytics…</p>
+      <div className="min-h-screen bg-slate-950 pt-20 pb-16 animate-pulse">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 space-y-8">
+          {/* Page title */}
+          <div className="h-8 w-64 bg-slate-800 rounded-xl" />
+
+          {/* Stat cards row */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="bg-slate-900/60 border border-slate-700/40 rounded-2xl p-5 space-y-3">
+                <div className="h-3 w-20 bg-slate-800 rounded-full" />
+                <div className="h-8 w-16 bg-slate-800 rounded-lg" />
+              </div>
+            ))}
+          </div>
+
+          {/* Bar chart placeholder */}
+          <div className="bg-slate-900/60 border border-slate-700/40 rounded-2xl p-6 space-y-4">
+            <div className="h-5 w-40 bg-slate-800 rounded-full" />
+            <div className="h-64 bg-slate-800/50 rounded-xl" />
+          </div>
+
+          {/* Pie chart placeholder */}
+          <div className="bg-slate-900/60 border border-slate-700/40 rounded-2xl p-6 space-y-4">
+            <div className="h-5 w-48 bg-slate-800 rounded-full" />
+            <div className="h-48 bg-slate-800/50 rounded-xl" />
+          </div>
         </div>
       </div>
     );

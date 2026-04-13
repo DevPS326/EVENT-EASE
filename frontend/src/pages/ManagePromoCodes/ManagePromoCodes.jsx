@@ -254,8 +254,23 @@ const ManagePromoCodes = () => {
 
       {/* Codes list */}
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
+        <div className="space-y-3 animate-pulse">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="bg-slate-900/60 border border-slate-700/40 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+              {/* Code pill */}
+              <div className="h-8 w-28 bg-slate-800 rounded-full flex-shrink-0" />
+              {/* Middle meta */}
+              <div className="flex-1 space-y-2">
+                <div className="h-3 w-40 bg-slate-800 rounded-full" />
+                <div className="h-3 w-28 bg-slate-800 rounded-full" />
+              </div>
+              {/* Badge + toggle */}
+              <div className="flex items-center gap-3">
+                <div className="h-6 w-16 bg-slate-800 rounded-full" />
+                <div className="h-8 w-8 bg-slate-800 rounded-lg" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : codes.length === 0 ? (
         <div className="text-center py-20 border border-dashed border-slate-800 rounded-2xl">

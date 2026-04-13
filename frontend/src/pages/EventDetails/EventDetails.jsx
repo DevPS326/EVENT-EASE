@@ -418,10 +418,48 @@ const EventDetails = () => {
   // ── Render states ────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center pt-20">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-slate-400 text-sm">Loading event…</p>
+      <div className="min-h-screen bg-slate-950 pt-20 pb-16 animate-pulse">
+        {/* Hero image skeleton */}
+        <div className="w-full h-[45vh] bg-slate-800/60" />
+
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left column */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Category + title */}
+            <div className="space-y-3">
+              <div className="h-4 w-32 bg-slate-800 rounded-full" />
+              <div className="h-9 w-3/4 bg-slate-800 rounded-xl" />
+              <div className="h-5 w-1/2 bg-slate-800 rounded-lg" />
+            </div>
+            {/* Meta chips */}
+            <div className="flex gap-3 flex-wrap">
+              {[140, 110, 160].map((w) => (
+                <div key={w} className="h-9 rounded-xl bg-slate-800/80" style={{ width: w }} />
+              ))}
+            </div>
+            {/* Description block */}
+            <div className="space-y-2 pt-2">
+              <div className="h-4 bg-slate-800 rounded-full w-full" />
+              <div className="h-4 bg-slate-800 rounded-full w-5/6" />
+              <div className="h-4 bg-slate-800 rounded-full w-4/6" />
+            </div>
+            {/* Ticket tier cards */}
+            <div className="space-y-3 pt-2">
+              {[1, 2].map((i) => (
+                <div key={i} className="h-20 rounded-2xl bg-slate-800/60 border border-slate-700/40" />
+              ))}
+            </div>
+          </div>
+
+          {/* Right column — booking card */}
+          <div className="lg:col-span-1">
+            <div className="sticky top-24 bg-slate-900/60 border border-slate-700/40 rounded-2xl p-6 space-y-5">
+              <div className="h-6 w-1/2 bg-slate-800 rounded-full" />
+              <div className="h-12 bg-slate-800 rounded-xl" />
+              <div className="h-12 bg-slate-800 rounded-xl" />
+              <div className="h-14 bg-violet-800/30 rounded-xl" />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -887,7 +925,7 @@ const EventDetails = () => {
                 <button
                   onClick={handlePayment}
                   disabled={paymentLoading || isSoldOut}
-                  className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-4 rounded-xl font-bold text-base transition-all hover:shadow-xl hover:shadow-violet-500/25 flex items-center justify-center gap-2"
+                  className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-4 rounded-xl font-bold text-base transition-all hover:shadow-xl hover:shadow-violet-500/40 flex items-center justify-center gap-2"
                 >
                   {paymentLoading ? (
                     <>
