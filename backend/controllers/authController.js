@@ -40,7 +40,8 @@ const verifyRecaptcha = async (token) => {
 // @desc    Register a new user
 // @route   POST /api/auth/signup
 exports.signup = async (req, res) => {
-    const { name, email, password, role } = req.body;
+    const { name, password, role } = req.body;
+    const email = (req.body.email || '').trim().toLowerCase();
 
     try {
         // Validation
@@ -58,8 +59,7 @@ exports.signup = async (req, res) => {
         }
 
         // IIT ISM domain restriction
-        const allowedDomain = /@iitism\.ac\.in$/;
-        if (!allowedDomain.test(email)) {
+        if (!email.endsWith('@iitism.ac.in')) {
             return res.status(403).json({
                 message: 'Access Restricted: Only IIT ISM campus emails (@iitism.ac.in) are allowed.',
             });
@@ -98,9 +98,17 @@ exports.signup = async (req, res) => {
 // @desc    Authenticate user & get token
 // @route   POST /api/auth/login
 exports.login = async (req, res) => {
-    const { email, password, recaptchaToken } = req.body;
+    const { password, recaptchaToken } = req.body;
+    const email = (req.body.email || '').trim().toLowerCase();
 
     try {
+        // IIT ISM domain restriction on login too
+        if (!email.endsWith('@iitism.ac.in')) {
+            return res.status(403).json({
+                message: 'Access Restricted: Only IIT ISM campus emails (@iitism.ac.in) are allowed.',
+            });
+        }
+
         // Optional Recaptcha check
         if (recaptchaToken) {
             const isHuman = await verifyRecaptcha(recaptchaToken);
@@ -201,7 +209,7 @@ exports.googleCallback = async (req, res) => {
             return res.redirect('http://localhost:5173/login?error=auth_failed');
         }
 
-        const email    = profile.emails?.[0]?.value;
+        const email    = (profile.emails?.[0]?.value || '').trim().toLowerCase();
         const name     = profile.displayName;
         const googleId = profile.id;
 

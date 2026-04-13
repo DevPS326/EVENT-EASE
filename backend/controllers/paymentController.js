@@ -28,6 +28,20 @@ exports.createOrder = async (req, res) => {
 
   try {
     const order = await PaymentService.createOrder(eventId, ticketTypeId, quantity, promoCode);
+
+    // Free ticket: PaymentService bypassed Razorpay — return immediately so the
+    // frontend skips the Razorpay checkout UI and goes straight to verifyPayment
+    // with isFree: true.
+    if (order.isFree || order.amount === 0) {
+      return res.status(200).json({
+        isFree:   true,
+        amount:   0,
+        currency: 'INR',
+        id:       order.id,
+        promoCode: order.promoCode || null,
+      });
+    }
+
     return res.status(200).json(order);
   } catch (err) {
     console.error('createOrder error:', err);

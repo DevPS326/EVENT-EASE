@@ -22,21 +22,24 @@ client.interceptors.request.use(
 );
 
 // ── Response Interceptor ───────────────────────────────────────────────────────
-// Globally catch 401/403 errors: clear session and redirect to /login.
+// 401 = token expired / invalid → force re-login.
+// 403 = domain restriction or permission denied → let the UI show the error,
+//       do NOT clear the session or redirect (user may be legitimately logged in).
 client.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status;
 
-    if (status === 401 || status === 403) {
+    if (status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       toast.error('Session expired. Please log in again.');
-      // Use window.location so we don't need to import router here
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
     }
+    // 403: fall through — caller's catch block receives the full error with
+    // err.response.data.message so the form can display the restriction message.
 
     return Promise.reject(error);
   }
