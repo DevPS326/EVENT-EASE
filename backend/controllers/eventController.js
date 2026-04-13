@@ -163,11 +163,13 @@ exports.getAllEvents = async (req, res) => {
         );
 
         const events = await Event.aggregate(pipeline);
-        res.json(events);
+        console.log(`[Events] Fetched ${events.length} events (filters: ${JSON.stringify(matchStage)})`);
+
+        res.json({ success: true, count: events.length, events });
 
     } catch (error) {
-        console.error('Error fetching all events:', error);
-        res.status(500).json({ message: "Server Error" });
+        console.error('[Events] getAllEvents error:', error);
+        res.status(500).json({ success: false, message: "Server Error" });
     }
 };
 

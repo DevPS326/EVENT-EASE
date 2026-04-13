@@ -130,8 +130,11 @@ const HomePage = () => {
       if (priceFilter === 'paid') { params.minPrice = 1; }
 
       const res = await client.get('/api/events', { params });
-      setEvents(Array.isArray(res.data) ? res.data : []);
+      // Support both legacy flat-array response and current { success, count, events } contract
+      const payload = res.data;
+      setEvents(Array.isArray(payload) ? payload : (payload?.events || []));
     } catch (err) {
+      console.error('[HomePage] fetchEvents error:', err.response?.data || err.message);
       toast.error(err.response?.data?.message || 'Failed to load events.');
       setEvents([]);
     } finally {

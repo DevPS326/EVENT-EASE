@@ -19,6 +19,7 @@ const path     = require('path');
 const bcrypt   = require('bcryptjs');
 const User     = require('./models/User');
 const Event    = require('./models/Event');
+const Ticket   = require('./models/Ticket');
 const connectDB = require('./config/db');
 
 dotenv.config();
@@ -109,9 +110,10 @@ const EXPANSION_TEMPLATES = [
 const seed = async () => {
   try {
     // ── 1. Wipe existing data ────────────────────────────────────────────────
+    await Ticket.deleteMany({});
     await Event.deleteMany({});
     await User.deleteMany({ role: { $in: ['organizer', 'admin'] } });
-    console.log('\x1b[31m%s\x1b[0m', '✗  Existing events + organizer accounts cleared');
+    console.log('\x1b[31m%s\x1b[0m', '✗  Existing tickets, events + organizer accounts cleared');
 
     // ── 2. Create admin organizer ────────────────────────────────────────────
     // Password is hashed by the User pre-save hook
@@ -164,7 +166,37 @@ const seed = async () => {
     const allEvents = [...baseEvents, ...expandedEvents];
     const inserted  = await Event.insertMany(allEvents);
 
-    // ── 6. Summary ───────────────────────────────────────────────────────────
+    // ── 6. Seed demo tickets for the admin user ──────────────────────────────
+    // Pick first 8 events and create one ticket each — gives the Dashboard page
+    // something to render immediately after seeding.
+    const ticketEvents = inserted.slice(0, 8);
+    const ticketDocs = ticketEvents.map((evt, i) => {
+      const tier = evt.ticketTypes[0]; // always exists (seeder guarantees it)
+      // insertMany() bypasses pre-save hooks — generate ticketId explicitly so
+      // the unique index doesn't collide on null.
+      const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
+      return {
+        event:              evt._id,
+        user:               admin._id,
+        ticketType:         tier._id,
+        ticketTypeName:     tier.name,
+        price:              tier.price,
+        eventTitleSnapshot: evt.title,
+        eventVenueSnapshot: evt.venue,
+        eventDateSnapshot:  evt.date,
+        ticketId:           `TKT-SEED-${Date.now()}-${i}-${suffix}`,
+        status:             'booked',
+      };
+    });
+    const seededTickets = await Ticket.insertMany(ticketDocs);
+
+    // Keep admin's purchasedTickets ref list in sync
+    await User.findByIdAndUpdate(admin._id, {
+      $push: { purchasedTickets: { $each: seededTickets.map(t => t._id) } },
+    });
+    console.log(`\x1b[33m%s\x1b[0m`, `✓  ${seededTickets.length} demo tickets created for admin`);
+
+    // ── Summary ──────────────────────────────────────────────────────────────
     const free  = inserted.filter(e => e.ticketTypes.every(t => t.price === 0)).length;
     const paid  = inserted.length - free;
     const cats  = inserted.reduce((acc, e) => { acc[e.category] = (acc[e.category] || 0) + 1; return acc; }, {});

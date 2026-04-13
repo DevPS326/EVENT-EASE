@@ -39,6 +39,19 @@ exports.getDashboardData = async (req, res) => {
     }
 };
 
+// @desc    Get own profile (no _id needed — resolved from JWT)
+// @route   GET /api/users/profile
+exports.getMyProfile = async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id).select('-password');
+        if (!user) return res.status(404).json({ message: 'User not found' });
+        res.json(user);
+    } catch (error) {
+        console.error('[UserController] getMyProfile error:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
 // @desc    Get user profile
 // @route   GET /api/users/:id
 exports.getUserProfile = async (req, res) => {
