@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, Loader2, SlidersHorizontal } from 'lucide-react';
 import toast from 'react-hot-toast';
 import client from '../../api/client';
@@ -152,10 +152,19 @@ const HomePage = () => {
     <div className="min-h-screen bg-slate-950 pt-20">
 
       {/* ── HERO ──────────────────────────────────────────────────────────── */}
-      <div className="relative overflow-hidden py-20 sm:py-28">
+      <div className="relative overflow-hidden py-28 sm:py-36">
         {/* Background glows */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-violet-600/20 rounded-full blur-[120px] -z-10 pointer-events-none" />
-        <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-fuchsia-600/10 rounded-full blur-[100px] -z-10 pointer-events-none" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[600px] bg-violet-600/25 rounded-full blur-[130px] -z-10 pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-[700px] h-[700px] bg-fuchsia-600/15 rounded-full blur-[110px] -z-10 pointer-events-none" />
+        <div className="absolute top-1/2 left-0 w-[500px] h-[500px] bg-indigo-600/10 rounded-full blur-[100px] -z-10 pointer-events-none" />
+        {/* Dot-grid overlay */}
+        <div
+          className="absolute inset-0 -z-10 pointer-events-none"
+          style={{
+            backgroundImage: 'radial-gradient(circle, rgba(139,92,246,0.18) 1px, transparent 1px)',
+            backgroundSize: '30px 30px',
+          }}
+        />
 
         <motion.div
           variants={heroVariants}
@@ -222,12 +231,15 @@ const HomePage = () => {
           {/* Stats strip */}
           <motion.div
             variants={heroItem}
-            className="mt-12 flex flex-wrap justify-center gap-x-10 gap-y-4"
+            className="mt-12 flex flex-wrap justify-center gap-4"
           >
             {STATS.map((stat, i) => (
-              <div key={i} className="text-center">
+              <div
+                key={i}
+                className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm"
+              >
                 <p className="text-2xl font-extrabold text-white">{stat.value}</p>
-                <p className="text-xs text-slate-500 uppercase tracking-widest mt-0.5">{stat.label}</p>
+                <p className="text-xs text-slate-400 uppercase tracking-widest leading-tight max-w-[60px]">{stat.label}</p>
               </div>
             ))}
           </motion.div>
@@ -242,7 +254,9 @@ const HomePage = () => {
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2.5">Category</p>
             <div className="flex flex-wrap gap-2">
-              <button
+              <motion.button
+                whileHover={{ scale: 1.06 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={() => setFilters((p) => ({ ...p, category: '' }))}
                 className={`px-4 py-1.5 rounded-full text-sm font-semibold border transition-all ${
                   !filters.category
@@ -251,10 +265,12 @@ const HomePage = () => {
                 }`}
               >
                 All
-              </button>
+              </motion.button>
               {CATEGORIES.map((cat) => (
-                <button
+                <motion.button
                   key={cat}
+                  whileHover={{ scale: 1.06 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={() =>
                     setFilters((p) => ({ ...p, category: p.category === cat ? '' : cat }))
                   }
@@ -265,7 +281,7 @@ const HomePage = () => {
                   }`}
                 >
                   {CATEGORY_ICONS[cat]} {cat}
-                </button>
+                </motion.button>
               ))}
             </div>
           </div>
@@ -327,7 +343,16 @@ const HomePage = () => {
           </div>
 
           {/* Advanced: date range + sort (collapsible) */}
+          <AnimatePresence>
           {advancedOpen && (
+            <motion.div
+              key="advanced-filters"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="overflow-hidden"
+            >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end pt-2 border-t border-slate-800">
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">From Date</label>
@@ -362,7 +387,9 @@ const HomePage = () => {
                 </div>
               </div>
             </div>
+            </motion.div>
           )}
+          </AnimatePresence>
 
           {hasActiveFilters && (
             <div className="flex justify-end border-t border-slate-800 pt-3">
