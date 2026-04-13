@@ -63,8 +63,17 @@ exports.updateUserProfile = async (req, res) => {
 
         if (user) {
             user.name = req.body.name || user.name;
-            user.email = req.body.email || user.email;
-            // Add other fields to update as needed
+
+            // IIT ISM domain restriction — prevent email change to non-campus address
+            if (req.body.email !== undefined) {
+                const emailNormalized = req.body.email.trim().toLowerCase();
+                if (!emailNormalized.endsWith('@iitism.ac.in')) {
+                    return res.status(403).json({
+                        message: 'Only IIT ISM emails (@iitism.ac.in) are allowed.',
+                    });
+                }
+                user.email = emailNormalized;
+            }
 
             const updatedUser = await user.save();
             res.json({

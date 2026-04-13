@@ -10,7 +10,13 @@ router.post('/verify-2fa', verify2FA);
 
 // Google OAuth routes
 // session: false is CRITICAL here
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'], session: false }));
+// hd hint pre-filters Google's account chooser to @iitism.ac.in accounts.
+// This is a UX aid — the hard gate is enforced in the Passport strategy callback.
+router.get('/google', passport.authenticate('google', {
+    scope:   ['profile', 'email'],
+    session: false,
+    hd:      'iitism.ac.in',
+}));
 
 router.get(
     '/google/callback', 

@@ -1,7 +1,8 @@
-const express = require('express');
-const dotenv = require('dotenv');
-const cors = require('cors');
-const passport = require('passport');
+const express   = require('express');
+const dotenv    = require('dotenv');
+const cors      = require('cors');
+const passport  = require('passport');
+const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/db');
 const startScheduler = require('./utils/scheduler');
 
@@ -37,8 +38,19 @@ app.options('*', cors(corsOptions)); // handle preflight for all routes
 app.use(cors(corsOptions));          // apply CORS policy to all routes
 app.use(passport.initialize()); // Initialize Passport
 
+// ── Rate limiting ─────────────────────────────────────────────────────────────
+// Auth routes: 20 attempts per 15 minutes per IP.
+// Tighter than the usual 100 to slow credential-stuffing / brute-force attacks.
+const authLimiter = rateLimit({
+  windowMs:         15 * 60 * 1000, // 15 minutes
+  max:              20,
+  standardHeaders:  true,           // Return rate-limit info in RateLimit-* headers
+  legacyHeaders:    false,
+  message: { success: false, message: 'Too many requests. Please try again in 15 minutes.' },
+});
+
 // Define API Routes
-app.use('/api/auth',      require('./routes/authRoutes'));
+app.use('/api/auth',      authLimiter, require('./routes/authRoutes'));
 app.use('/api/events',    require('./routes/eventRoutes'));
 app.use('/api/payments',  require('./routes/paymentRoutes'));
 app.use('/api/tickets',   require('./routes/ticketRoutes'));

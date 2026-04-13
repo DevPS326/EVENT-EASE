@@ -1,6 +1,8 @@
 // backend/controllers/waitlistController.js
-const Waitlist = require('../models/Waitlist');
-const Event    = require('../models/Event');
+const Waitlist     = require('../models/Waitlist');
+const Event        = require('../models/Event');
+const Notification = require('../models/Notification');
+const { sendEmail } = require('../utils/emailService');
 
 const sendError = (res, status, msg) => res.status(status).json({ success: false, message: msg });
 
@@ -93,5 +95,62 @@ exports.getPosition = async (req, res) => {
   } catch (err) {
     console.error('getPosition error:', err);
     return sendError(res, 500, 'Server error');
+  }
+};
+
+// ─── Auto-promotion helper ───────────────────────────────────────────────────
+/**
+ * Notify the next person in FIFO waitlist order that a spot has opened.
+ * Call this OUTSIDE transactions (non-blocking, fire-and-forget safe).
+ *
+ * @param {string|ObjectId} eventId
+ * @param {string|ObjectId} ticketTypeId
+ */
+exports.notifyNextInWaitlist = async (eventId, ticketTypeId) => {
+  try {
+    const nextUser = await Waitlist.findOne({
+      event:      eventId,
+      ticketType: ticketTypeId,
+      status:     'waiting',
+    })
+      .sort({ createdAt: 1 })          // FIFO — earliest joiner first
+      .populate('user',  'name email')
+      .populate('event', 'title');
+
+    if (!nextUser || !nextUser.user?.email) return; // no one waiting
+
+    // Atomic status update — prevents double-notification on concurrent calls
+    const claimed = await Waitlist.findOneAndUpdate(
+      { _id: nextUser._id, status: 'waiting' },    // re-check status atomically
+      { $set: { status: 'notified', notifiedAt: new Date() } },
+      { new: true }
+    );
+    if (!claimed) return; // another process already notified this entry
+
+    const eventTitle = nextUser.event?.title || 'your event';
+    const bookUrl    = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/events/${eventId}`;
+
+    // Email notification
+    await sendEmail(
+      nextUser.user.email,
+      `A spot just opened for ${eventTitle}!`,
+      `<h2>Good news, ${nextUser.user.name || 'there'}!</h2>
+       <p>A ticket for <strong>${eventTitle}</strong> has just become available.</p>
+       <p><a href="${bookUrl}" style="background:#7c3aed;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:bold;">Book Now</a></p>
+       <p style="color:#888;font-size:12px;">Availability is not guaranteed — first come, first served.</p>`
+    );
+
+    // In-app notification (non-blocking)
+    Notification.create({
+      user:    nextUser.user._id,
+      type:    'waitlist_spot',
+      title:   `Spot Available — ${eventTitle}`,
+      message: `A ticket for ${eventTitle} just opened up. Book now!`,
+      link:    `/events/${eventId}`,
+    }).catch(() => {});
+
+    console.log(`[Waitlist] Notified ${nextUser.user.email} for "${eventTitle}"`);
+  } catch (err) {
+    console.error('[Waitlist] notifyNextInWaitlist error:', err.message);
   }
 };
