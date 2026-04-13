@@ -93,7 +93,10 @@ const RegisterPage = () => {
               {...register('email')}
               className={inputCls(!!errors.email)}
             />
-            {errors.email && <p className="text-red-400 text-xs mt-1">{errors.email.message}</p>}
+            {errors.email
+              ? <p className="text-red-400 text-xs mt-1">{errors.email.message}</p>
+              : <p className="text-slate-500 text-xs mt-1">Use your official @iitism.ac.in email</p>
+            }
           </div>
 
           {/* Password */}

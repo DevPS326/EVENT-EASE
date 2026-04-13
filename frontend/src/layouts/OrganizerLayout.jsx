@@ -25,7 +25,7 @@ const OrganizerLayout = () => {
           </span>
           <span className="text-base group-hover:-translate-y-0.5 transition-transform">🚀</span>
         </Link>
-        <p className="text-xs text-slate-500 mt-1">Organizer Portal</p>
+        <p className="text-xs text-slate-500 mt-1">Club HQ</p>
       </div>
 
       {/* Nav */}

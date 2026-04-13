@@ -44,7 +44,7 @@ const Navbar = () => {
             <NavLink to="/">Events</NavLink>
 
             {isAuthenticated && user?.role === 'organizer' && (
-              <NavLink to="/organizer/dashboard">Organizer Portal</NavLink>
+              <NavLink to="/organizer/dashboard">Club HQ</NavLink>
             )}
             {isAuthenticated && user?.role !== 'organizer' && (
               <NavLink to="/my-tickets">My Tickets</NavLink>
@@ -129,7 +129,7 @@ const Navbar = () => {
               <MobileNavLink to="/" onClick={closeMenu}>Events</MobileNavLink>
 
               {isAuthenticated && user?.role === 'organizer' && (
-                <MobileNavLink to="/organizer/dashboard" onClick={closeMenu}>Organizer Portal</MobileNavLink>
+                <MobileNavLink to="/organizer/dashboard" onClick={closeMenu}>Club HQ</MobileNavLink>
               )}
               {isAuthenticated && user?.role !== 'organizer' && (
                 <MobileNavLink to="/my-tickets" onClick={closeMenu}>My Tickets</MobileNavLink>

@@ -71,10 +71,10 @@ const OrganizerDashboard = () => {
 
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-12">
-          <StatCard label="Total Events"    value={loading ? '—' : events.length}  icon="📅" color="violet"  />
-          <StatCard label="Upcoming"        value={loading ? '—' : upcomingCount}   icon="🚀" color="fuchsia" />
-          <StatCard label="Tickets Sold"    value={loading ? '—' : totalSold}       icon="🎟" color="emerald" />
-          <StatCard label="Ticket Tiers"    value={loading ? '—' : totalTiers}      icon="🏷" color="sky"     />
+          <StatCard label="Total Events"      value={loading ? '—' : events.length}  icon="📅" color="violet"  />
+          <StatCard label="Active on Campus" value={loading ? '—' : upcomingCount}   icon="🚀" color="fuchsia" />
+          <StatCard label="Student Reach"    value={loading ? '—' : totalSold}       icon="🎟" color="emerald" />
+          <StatCard label="Ticket Tiers"     value={loading ? '—' : totalTiers}      icon="🏷" color="sky"     />
         </div>
 
         {/* Your Events */}

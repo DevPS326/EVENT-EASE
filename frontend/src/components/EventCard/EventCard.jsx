@@ -60,7 +60,7 @@ const EventCard = ({ event }) => {
       className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden hover:border-violet-500/40 hover:shadow-2xl hover:shadow-violet-500/20 transition-colors duration-300 group flex flex-col"
     >
       {/* ── IMAGE ──────────────────────────────────────────────────────────── */}
-      <div className="h-52 overflow-hidden relative flex-shrink-0">
+      <div className="aspect-video overflow-hidden relative flex-shrink-0">
         <img
           src={imgError ? FALLBACK_IMG : (event.imageUrl || FALLBACK_IMG)}
           alt={event.title}
@@ -116,10 +116,16 @@ const EventCard = ({ event }) => {
           {event.title}
         </h3>
 
-        <p className="text-slate-500 text-xs mb-3 flex items-center gap-1">
+        <p className="text-slate-500 text-xs mb-1.5 flex items-center gap-1">
           <MapPin className="w-3 h-3 flex-shrink-0" />
           <span className="line-clamp-1">{event.venue}</span>
         </p>
+
+        {event.organizer?.name && (
+          <p className="text-indigo-400 text-xs font-medium mb-3">
+            by {event.organizer.name}
+          </p>
+        )}
 
         <p className="text-slate-400 text-sm mb-5 line-clamp-2 flex-1">
           {event.description}

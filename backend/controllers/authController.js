@@ -57,6 +57,14 @@ exports.signup = async (req, res) => {
             return res.status(400).json({ message: 'Password must be at least 6 characters' });
         }
 
+        // IIT ISM domain restriction
+        const allowedDomain = /@iitism\.ac\.in$/;
+        if (!allowedDomain.test(email)) {
+            return res.status(403).json({
+                message: 'Access Restricted: Only IIT ISM campus emails (@iitism.ac.in) are allowed.',
+            });
+        }
+
         // Check if user exists
         const userExists = await User.findOne({ email });
         if (userExists) {
@@ -202,6 +210,12 @@ exports.googleCallback = async (req, res) => {
         if (!email) {
             console.log('[googleCallback] ERROR: No email returned from Google profile.');
             return res.redirect('http://localhost:5173/login?error=auth_failed');
+        }
+
+        // IIT ISM domain restriction for Google OAuth
+        if (!email.endsWith('@iitism.ac.in')) {
+            console.log('[googleCallback] Blocked non-IIT email via Google OAuth:', email);
+            return res.redirect('http://localhost:5173/login?error=restricted_domain');
         }
 
         // Check if user exists in DB
