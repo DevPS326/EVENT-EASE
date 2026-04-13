@@ -22,18 +22,23 @@ const gridVariants = {
 
 // ── Skeleton card ──────────────────────────────────────────────────────────────
 const SkeletonCard = () => (
-  <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden animate-pulse">
-    <div className="h-48 bg-slate-800" />
-    <div className="p-5 space-y-3">
-      <div className="h-3 bg-slate-800 rounded w-2/5" />
+  <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+    {/* Image skeleton — matches new h-52 card */}
+    <div className="h-52 bg-slate-800 animate-pulse relative">
+      {/* Fake price badge top-right */}
+      <div className="absolute top-3 right-3 h-6 w-16 bg-slate-700 rounded-full" />
+      {/* Fake urgency placeholder top-left */}
+      <div className="absolute top-3 left-3 h-6 w-20 bg-slate-700 rounded-full" />
+    </div>
+    {/* Content skeleton */}
+    <div className="p-5 space-y-3 animate-pulse">
+      <div className="h-3 bg-slate-800 rounded-full w-2/5" />
       <div className="h-5 bg-slate-800 rounded w-4/5" />
       <div className="h-3 bg-slate-800 rounded w-1/3" />
       <div className="h-3 bg-slate-800 rounded w-full" />
       <div className="h-3 bg-slate-800 rounded w-3/4" />
-      <div className="flex justify-between items-center pt-3 border-t border-slate-800 mt-2">
-        <div className="h-5 bg-slate-800 rounded w-1/4" />
-        <div className="h-8 bg-slate-800 rounded-lg w-1/4" />
-      </div>
+      {/* Full-width CTA skeleton */}
+      <div className="h-9 bg-slate-800 rounded-xl w-full mt-1" />
     </div>
   </div>
 );

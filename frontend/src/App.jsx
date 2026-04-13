@@ -1,5 +1,6 @@
 import React from 'react';
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 
 import Navbar from './components/Navbar/Navbar.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
@@ -26,11 +27,22 @@ import ManagePromoCodes from './pages/ManagePromoCodes/ManagePromoCodes.jsx';
 import EditEvent from './pages/EditEvent/EditEvent.jsx';
 import OrganizerLayout from './layouts/OrganizerLayout.jsx';
 
-function App() {
+// ── Animated route wrapper ─────────────────────────────────────────────────────
+// Must live inside <Router> to access useLocation.
+// AnimatePresence keys on pathname so each navigation triggers fade+slide.
+const AnimatedRoutes = () => {
+  const location = useLocation();
+
   return (
-    <Router>
-      <Navbar />
-      <main className="py-8">
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.main
+        key={location.pathname}
+        className="py-8"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.18, ease: 'easeOut' }}
+      >
         <Routes>
 
           {/* ── PUBLIC ROUTES ──────────────────────────────────────────── */}
@@ -72,7 +84,17 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
 
         </Routes>
-      </main>
+      </motion.main>
+    </AnimatePresence>
+  );
+};
+
+// ── App shell ──────────────────────────────────────────────────────────────────
+function App() {
+  return (
+    <Router>
+      <Navbar />
+      <AnimatedRoutes />
     </Router>
   );
 }
