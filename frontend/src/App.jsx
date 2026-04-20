@@ -1,31 +1,35 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import Navbar from './components/Navbar/Navbar.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import OrganizerRoute from './components/OrganizerRoute.jsx';
+import OrganizerLayout from './layouts/OrganizerLayout.jsx';
 
-// Public pages
-import HomePage from './pages/HomePage/HomePage.jsx';
-import LoginPage from './pages/LoginPage/LoginPage.jsx';
-import RegisterPage from './pages/RegisterPage/RegisterPage.jsx';
-import EventDetails from './pages/EventDetails/EventDetails.jsx';
-import PolicyPage from './pages/PolicyPage/PolicyPage.jsx';
+// Eagerly loaded — needed on first paint
+import HomePage    from './pages/HomePage/HomePage.jsx';
 import OAuthCallback from './pages/OAuthCallback/OAuthCallback.jsx';
 
-// User-only pages (require auth)
-import Dashboard from './pages/Dashboard/Dashboard.jsx';
-import Profile from './pages/Profile/Profile.jsx';
+// Lazy loaded — split into separate chunks
+const LoginPage         = lazy(() => import('./pages/LoginPage/LoginPage.jsx'));
+const RegisterPage      = lazy(() => import('./pages/RegisterPage/RegisterPage.jsx'));
+const EventDetails      = lazy(() => import('./pages/EventDetails/EventDetails.jsx'));
+const PolicyPage        = lazy(() => import('./pages/PolicyPage/PolicyPage.jsx'));
+const Dashboard         = lazy(() => import('./pages/Dashboard/Dashboard.jsx'));
+const Profile           = lazy(() => import('./pages/Profile/Profile.jsx'));
+const OrganizerDashboard = lazy(() => import('./pages/OrganizerDashboard/OrganizerDashboard.jsx'));
+const CreateEvent       = lazy(() => import('./components/CreateEvent/CreateEvent.jsx'));
+const EventAnalytics    = lazy(() => import('./pages/EventAnalytics/EventAnalytics.jsx'));
+const CheckIn           = lazy(() => import('./pages/CheckIn/CheckIn.jsx'));
+const ManagePromoCodes  = lazy(() => import('./pages/ManagePromoCodes/ManagePromoCodes.jsx'));
+const EditEvent         = lazy(() => import('./pages/EditEvent/EditEvent.jsx'));
 
-// Organizer-only pages (require auth + organizer role)
-import OrganizerDashboard from './pages/OrganizerDashboard/OrganizerDashboard.jsx';
-import CreateEvent from './components/CreateEvent/CreateEvent.jsx';
-import EventAnalytics from './pages/EventAnalytics/EventAnalytics.jsx';
-import CheckIn from './pages/CheckIn/CheckIn.jsx';
-import ManagePromoCodes from './pages/ManagePromoCodes/ManagePromoCodes.jsx';
-import EditEvent from './pages/EditEvent/EditEvent.jsx';
-import OrganizerLayout from './layouts/OrganizerLayout.jsx';
+const PageLoader = () => (
+  <div className="flex h-64 items-center justify-center">
+    <div className="w-8 h-8 rounded-full border-2 border-violet-500 border-t-transparent animate-spin" />
+  </div>
+);
 
 // ── Animated route wrapper ─────────────────────────────────────────────────────
 // Must live inside <Router> to access useLocation.
@@ -34,6 +38,7 @@ const AnimatedRoutes = () => {
   const location = useLocation();
 
   return (
+    <Suspense fallback={<PageLoader />}>
     <AnimatePresence mode="wait" initial={false}>
       <motion.main
         key={location.pathname}
@@ -86,6 +91,7 @@ const AnimatedRoutes = () => {
         </Routes>
       </motion.main>
     </AnimatePresence>
+    </Suspense>
   );
 };
 

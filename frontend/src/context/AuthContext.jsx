@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { jwtDecode } from 'jwt-decode';
+import axios from 'axios';
 
 const AuthContext = createContext(null);
 
@@ -10,29 +11,48 @@ export const AuthProvider = ({ children }) => {
   // null = not yet determined, true/false = determined
   const [isLoading, setIsLoading] = useState(true);
 
-  // Restore session from localStorage on mount
+  // Restore session from localStorage on mount; re-fetch profile to keep name/email fresh
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
-    if (storedToken) {
-      try {
-        const decoded = jwtDecode(storedToken);
-        // Reject expired tokens
-        if (decoded.exp * 1000 < Date.now()) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-        } else {
-          const storedUser = JSON.parse(localStorage.getItem('user') || 'null');
-          setToken(storedToken);
-          setUser(storedUser);
-          setRole(decoded.role || storedUser?.role || 'user');
-        }
-      } catch {
-        // Malformed token — clear storage silently
+    if (!storedToken) { setIsLoading(false); return; }
+
+    let decoded = {};
+    try {
+      decoded = jwtDecode(storedToken);
+      if (decoded.exp * 1000 < Date.now()) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        setIsLoading(false);
+        return;
       }
+    } catch {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      setIsLoading(false);
+      return;
     }
-    setIsLoading(false);
+
+    // Restore from storage immediately so UI doesn't flash unauthenticated
+    const storedUser = JSON.parse(localStorage.getItem('user') || 'null');
+    setToken(storedToken);
+    setUser(storedUser);
+    setRole(decoded.role || storedUser?.role || 'user');
+
+    // Fetch fresh profile from API (catches stale name/email, post-OAuth hydration)
+    const apiBase = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    axios
+      .get(`${apiBase}/api/users/profile`, {
+        headers: { Authorization: `Bearer ${storedToken}` },
+      })
+      .then(({ data }) => {
+        const resolvedRole = data.role || decoded.role || 'user';
+        const fresh = { ...data, role: resolvedRole };
+        localStorage.setItem('user', JSON.stringify(fresh));
+        setUser(fresh);
+        setRole(resolvedRole);
+      })
+      .catch(() => { /* silently ignore — stored data is usable fallback */ })
+      .finally(() => setIsLoading(false));
   }, []);
 
   /**

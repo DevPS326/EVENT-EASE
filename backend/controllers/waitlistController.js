@@ -1,4 +1,5 @@
 // backend/controllers/waitlistController.js
+const logger = require('../utils/logger');
 const Waitlist     = require('../models/Waitlist');
 const Event        = require('../models/Event');
 const Notification = require('../models/Notification');
@@ -45,7 +46,7 @@ exports.joinWaitlist = async (req, res) => {
     if (err.code === 11000) {
       return sendError(res, 409, 'You are already on the waitlist for this tier');
     }
-    console.error('joinWaitlist error:', err);
+    logger.error('joinWaitlist error:', err);
     return sendError(res, 500, 'Server error');
   }
 };
@@ -62,7 +63,7 @@ exports.leaveWaitlist = async (req, res) => {
     if (result.deletedCount === 0) return sendError(res, 404, 'You are not on this waitlist');
     return res.status(200).json({ success: true });
   } catch (err) {
-    console.error('leaveWaitlist error:', err);
+    logger.error('leaveWaitlist error:', err);
     return sendError(res, 500, 'Server error');
   }
 };
@@ -93,7 +94,7 @@ exports.getPosition = async (req, res) => {
 
     return res.status(200).json({ onWaitlist: true, position, total, status: entry.status });
   } catch (err) {
-    console.error('getPosition error:', err);
+    logger.error('getPosition error:', err);
     return sendError(res, 500, 'Server error');
   }
 };
@@ -149,8 +150,8 @@ exports.notifyNextInWaitlist = async (eventId, ticketTypeId) => {
       link:    `/events/${eventId}`,
     }).catch(() => {});
 
-    console.log(`[Waitlist] Notified ${nextUser.user.email} for "${eventTitle}"`);
+    logger.info(`[Waitlist] Notified ${nextUser.user.email} for "${eventTitle}"`);
   } catch (err) {
-    console.error('[Waitlist] notifyNextInWaitlist error:', err.message);
+    logger.error('[Waitlist] notifyNextInWaitlist error:', err.message);
   }
 };

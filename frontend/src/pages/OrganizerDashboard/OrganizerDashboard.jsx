@@ -17,7 +17,7 @@ const OrganizerDashboard = () => {
       const res = await client.get('/api/events/organizer');
       setEvents(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to load your events.');
+      toast.error(err.response?.data?.message || 'Failed to load your events.', { id: 'org-events-load' });
     } finally {
       setLoading(false);
     }
@@ -31,7 +31,7 @@ const OrganizerDashboard = () => {
       setEvents((prev) => prev.filter((e) => e._id !== eventId));
       toast.success('Event deleted.');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to delete event.');
+      toast.error(err.response?.data?.message || 'Failed to delete event.', { id: 'org-event-delete' });
     }
   };
 

@@ -9,9 +9,11 @@
 //
 // Nothing HTTP-specific (req/res) lives here.
 
+const logger = require('../utils/logger');
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 const qrcode = require('qrcode');
+const crypto = require('crypto');
 
 const Payment      = require('../models/Payment');
 const Ticket       = require('../models/Ticket');
@@ -80,6 +82,19 @@ const createBooking = async ({
   session.startTransaction();
 
   try {
+    // ── 0. Duplicate booking guard ─────────────────────────────────────────
+    // Check BEFORE opening expensive inventory locks. One active ticket per
+    // user per ticket type per event. Cancelled tickets don't block re-booking.
+    const existingTicket = await Ticket.findOne({
+      user:       userId,
+      event:      eventId,
+      ticketType: ticketTypeId,
+      status:     { $nin: ['cancelled', 'refunded'] },
+    }).session(session);
+    if (existingTicket) {
+      throw new Error('You already have an active ticket for this tier');
+    }
+
     // ── 1. Fetch event (canonical price and availability source) ──────────
     const event = await Event.findById(eventId).session(session);
     if (!event) throw new Error('Event not found');
@@ -145,12 +160,12 @@ const createBooking = async ({
         ticketId: tempTicketId,
       };
 
-      const qrData = JSON.stringify({
-        id: tempTicketId,
-        evt: event.title,
-        type: ticketType.name,
-        usr: user.email,
-      });
+      // HMAC-signed QR payload — prevents forged QR codes.
+      // Verifier reconstructs the signature from the payload and rejects mismatches.
+      const qrSecret  = process.env.QR_SECRET || process.env.JWT_SECRET;
+      const qrPayload = JSON.stringify({ id: tempTicketId, evt: String(event._id), ts: Date.now() });
+      const qrSig     = crypto.createHmac('sha256', qrSecret).update(qrPayload).digest('hex');
+      const qrData    = JSON.stringify({ p: qrPayload, s: qrSig });
 
       ticketData.qrCode = await qrcode.toDataURL(qrData);
       ticketsToCreate.push(ticketData);
@@ -191,7 +206,7 @@ const createBooking = async ({
       DiscountCode.findOneAndUpdate(
         { code: promoCode.toUpperCase().trim() },
         { $inc: { usedCount: 1 } }
-      ).catch(err => console.error('Failed to increment promo usedCount:', err));
+      ).catch(err => logger.error('Failed to increment promo usedCount:', err));
     }
 
     // ── 8. In-app booking notification (outside transaction, non-blocking) ─
@@ -201,7 +216,7 @@ const createBooking = async ({
       title:   `Booking Confirmed — ${event.title}`,
       message: `Your ${qty} ticket${qty > 1 ? 's' : ''} for ${event.title} are confirmed! Check your email for QR codes.`,
       link:    `/my-tickets`,
-    }).catch(err => console.error('Failed to create booking notification:', err));
+    }).catch(err => logger.error('Failed to create booking notification:', err));
 
     // ── 9. Send confirmation email (outside transaction, non-blocking) ────
     sendEmail(
@@ -213,7 +228,7 @@ const createBooking = async ({
         content: qr.split('base64,')[1],
         encoding: 'base64',
       }))
-    ).catch(err => console.error('Email send failed:', err));
+    ).catch(err => logger.error('Email send failed:', err));
 
     return { ticketIds };
 
@@ -222,7 +237,7 @@ const createBooking = async ({
     try {
       if (session.inTransaction()) await session.abortTransaction();
     } catch (abortErr) {
-      console.error('Error aborting transaction:', abortErr);
+      logger.error('Error aborting transaction:', abortErr);
     } finally {
       session.endSession();
     }

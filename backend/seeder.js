@@ -112,11 +112,11 @@ const seed = async () => {
     // ── 1. Wipe existing data ────────────────────────────────────────────────
     await Ticket.deleteMany({});
     await Event.deleteMany({});
-    await User.deleteMany({ role: { $in: ['organizer', 'admin'] } });
+    await User.deleteMany({ role: { $in: ['organizer', 'admin', 'user'] } });
     console.log('\x1b[31m%s\x1b[0m', '✗  Existing tickets, events + organizer accounts cleared');
 
-    // ── 2. Create admin organizer ────────────────────────────────────────────
-    // Password is hashed by the User pre-save hook
+    // ── 2. Create admin organizer + demo student ─────────────────────────────
+    // Passwords are hashed by the User pre-save hook
     const admin = await User.create({
       name:     'ISM Admin',
       email:    'admin@iitism.ac.in',
@@ -124,6 +124,14 @@ const seed = async () => {
       role:     'organizer',
     });
     console.log('\x1b[33m%s\x1b[0m', `✓  Admin organizer created: ${admin._id}`);
+
+    const student = await User.create({
+      name:     'ISM Student',
+      email:    'student@iitism.ac.in',
+      password: 'Password@123',
+      role:     'user',
+    });
+    console.log('\x1b[33m%s\x1b[0m', `✓  Demo student created: ${student._id}`);
 
     // ── 3. Process base events from JSON ─────────────────────────────────────
     const baseRaw = require('./data/events.json');
@@ -196,6 +204,31 @@ const seed = async () => {
     });
     console.log(`\x1b[33m%s\x1b[0m`, `✓  ${seededTickets.length} demo tickets created for admin`);
 
+    // ── 7. Seed demo tickets for the student user ────────────────────────────
+    // Pick next 5 events (index 8–12) so student has a distinct ticket set
+    const studentTicketEvents = inserted.slice(8, 13);
+    const studentTicketDocs = studentTicketEvents.map((evt, i) => {
+      const tier   = evt.ticketTypes[0];
+      const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
+      return {
+        event:              evt._id,
+        user:               student._id,
+        ticketType:         tier._id,
+        ticketTypeName:     tier.name,
+        price:              tier.price,
+        eventTitleSnapshot: evt.title,
+        eventVenueSnapshot: evt.venue,
+        eventDateSnapshot:  evt.date,
+        ticketId:           `TKT-SEED-STU-${Date.now()}-${i}-${suffix}`,
+        status:             'booked',
+      };
+    });
+    const studentTickets = await Ticket.insertMany(studentTicketDocs);
+    await User.findByIdAndUpdate(student._id, {
+      $push: { purchasedTickets: { $each: studentTickets.map(t => t._id) } },
+    });
+    console.log(`\x1b[33m%s\x1b[0m`, `✓  ${studentTickets.length} demo tickets created for student`);
+
     // ── Summary ──────────────────────────────────────────────────────────────
     const free  = inserted.filter(e => e.ticketTypes.every(t => t.price === 0)).length;
     const paid  = inserted.length - free;
@@ -208,7 +241,8 @@ const seed = async () => {
     console.log('   Free events           :', free);
     console.log('   Paid events           :', paid);
     console.log('   Category breakdown    :', cats);
-    console.log('\n\x1b[32m%s\x1b[0m', '   Login: admin@iitism.ac.in / Password@123');
+    console.log('\n\x1b[32m%s\x1b[0m', '   Login (organizer): admin@iitism.ac.in / Password@123');
+    console.log('\x1b[32m%s\x1b[0m',   '   Login (student)  : student@iitism.ac.in / Password@123');
     console.log('');
 
     process.exit(0);

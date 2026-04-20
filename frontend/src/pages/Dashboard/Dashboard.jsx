@@ -152,7 +152,7 @@ const Dashboard = () => {
         pastBookings:   res.data.pastBookings   || [],
       });
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to load tickets.');
+      toast.error(err.response?.data?.message || 'Failed to load tickets.', { id: 'tickets-load' });
     } finally {
       setLoading(false);
     }

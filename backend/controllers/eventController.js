@@ -1,4 +1,5 @@
 // backend/controllers/eventController.js
+const logger = require('../utils/logger');
 const mongoose = require('mongoose');
 const Event = require('../models/Event');
 const User = require('../models/User');
@@ -71,7 +72,7 @@ exports.createEvent = async (req, res) => {
         if (error.message && (error.message.includes('Invalid') || error.message.includes('required'))) {
             return res.status(400).json({ message: error.message });
         }
-        console.error('Error creating event:', error);
+        logger.error('Error creating event:', error);
         res.status(500).json({ message: "Server Error: " + error.message });
     }
 };
@@ -82,6 +83,10 @@ exports.createEvent = async (req, res) => {
 exports.getAllEvents = async (req, res) => {
     try {
         const { search, category, minPrice, maxPrice, startDate, endDate, sortBy, order } = req.query;
+
+        // Pagination
+        const page  = Math.max(1, parseInt(req.query.page  || '1'));
+        const limit = Math.min(50, Math.max(1, parseInt(req.query.limit || '20')));
         let matchStage = {};
 
         // 1. Build Filter Query (Match Stage)
@@ -127,14 +132,19 @@ exports.getAllEvents = async (req, res) => {
             { $unset: '_ticketSales' }, // drop raw array immediately — keep only the count
         ];
 
-        // 3. Sorting
+        // 3. Count total (before pagination) — separate facet pipeline
+        const countPipeline = [...pipeline, { $count: 'total' }];
+
+        // 4. Sorting
         const sortDirection = order === 'desc' ? -1 : 1;
         if (sortBy === 'popularity') {
             pipeline.push({ $sort: { attendeesCount: sortDirection } });
         } else {
-            // Default sort by date
             pipeline.push({ $sort: { date: sortDirection } });
         }
+
+        // Pagination stages
+        pipeline.push({ $skip: (page - 1) * limit }, { $limit: limit });
 
         // 4. Lookup Organizer (Populate)
         pipeline.push(
@@ -162,13 +172,25 @@ exports.getAllEvents = async (req, res) => {
             }
         );
 
-        const events = await Event.aggregate(pipeline);
-        console.log(`[Events] Fetched ${events.length} events (filters: ${JSON.stringify(matchStage)})`);
+        const [events, countResult] = await Promise.all([
+            Event.aggregate(pipeline),
+            Event.aggregate(countPipeline),
+        ]);
+        const total = countResult[0]?.total ?? 0;
 
-        res.json({ success: true, count: events.length, events });
+        logger.info(`[Events] Fetched ${events.length}/${total} events (page ${page}, filters: ${JSON.stringify(matchStage)})`);
+
+        res.json({
+            success: true,
+            count:   events.length,
+            total,
+            page,
+            pages:   Math.ceil(total / limit),
+            events,
+        });
 
     } catch (error) {
-        console.error('[Events] getAllEvents error:', error);
+        logger.error('[Events] getAllEvents error:', error);
         res.status(500).json({ success: false, message: "Server Error" });
     }
 };
@@ -185,7 +207,7 @@ exports.getEventById = async (req, res) => {
             res.status(404).json({ message: 'Event not found' });
         }
     } catch (error) {
-        console.error('Error fetching event by ID:', error);
+        logger.error('Error fetching event by ID:', error);
         res.status(500).json({ message: "Server Error" });
     }
 };
@@ -255,7 +277,7 @@ exports.updateEvent = async (req, res) => {
                         <p><strong>New Venue:</strong> ${updatedEvent.venue}</p>
                         <p>Best regards,<br>The EventEase Team</p>
                     `;
-                    return sendEmail(attendee.email, subject, htmlContent).catch(e => console.error(e));
+                    return sendEmail(attendee.email, subject, htmlContent).catch(e => logger.error(e));
                 }));
             }
 
@@ -264,7 +286,7 @@ exports.updateEvent = async (req, res) => {
             res.status(404).json({ message: 'Event not found' });
         }
     } catch (error) {
-        console.error('Error updating event:', error);
+        logger.error('Error updating event:', error);
         if (error.message && (error.message.includes('Invalid') || error.message.includes('required'))) {
             return res.status(400).json({ message: error.message });
         }
@@ -327,7 +349,7 @@ exports.deleteEvent = async (req, res) => {
                 <p>Contact support for refunds.</p>
                 <p>The EventEase Team</p>
             `;
-            sendEmail(attendee.email, subject, htmlContent).catch(err => console.error(err));
+            sendEmail(attendee.email, subject, htmlContent).catch(err => logger.error(err));
         });
 
         res.json({ message: 'Event and related data removed' });
@@ -335,7 +357,7 @@ exports.deleteEvent = async (req, res) => {
     } catch (error) {
         await session.abortTransaction();
         session.endSession();
-        console.error('Error deleting event:', error);
+        logger.error('Error deleting event:', error);
         res.status(500).json({ message: "Server Error" });
     }
 };
@@ -350,7 +372,7 @@ exports.getOrganizerEvents = async (req, res) => {
             .sort({ createdAt: -1 }); // Sort by newest created
         res.json(events);
     } catch (error) {
-        console.error('Error fetching organizer events:', error);
+        logger.error('Error fetching organizer events:', error);
         res.status(500).json({ message: "Server Error" });
     }
 };
@@ -397,16 +419,29 @@ exports.getEventAnalytics = async (req, res) => {
             }
         });
 
+        // Daily sales time-series for charts
+        const dailySales = await Ticket.aggregate([
+            { $match: { event: event._id } },
+            { $group: {
+                _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+                count:   { $sum: 1 },
+                revenue: { $sum: '$price' },
+            }},
+            { $sort: { _id: 1 } },
+            { $project: { date: '$_id', count: 1, revenue: 1, _id: 0 } },
+        ]);
+
         res.json({
             totalTicketsSold: tickets.length,
             totalRevenue,
             ticketTypeSales,
+            dailySales,
             eventCapacity: event.ticketTypes.reduce((acc, type) => acc + (type.quantity || 0), 0),
             ticketsAvailable: event.ticketTypes.reduce((acc, type) => acc + (type.available || 0), 0),
         });
 
     } catch (error) {
-        console.error('Error fetching event analytics:', error);
+        logger.error('Error fetching event analytics:', error);
         res.status(500).json({ message: "Server Error" });
     }
 };
@@ -469,7 +504,7 @@ exports.exportAttendeesCSV = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error exporting attendees:', error);
+        logger.error('Error exporting attendees:', error);
         res.status(500).json({ message: 'Server Error' });
     }
 };

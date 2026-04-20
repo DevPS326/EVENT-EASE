@@ -31,7 +31,7 @@ const CheckIn = () => {
         setEvents(list);
         if (list.length === 1) setSelectedEventId(list[0]._id);
       })
-      .catch(() => toast.error('Could not load your events.'));
+      .catch(() => toast.error('Could not load your events.', { id: 'checkin-events' }));
   }, []);
 
   // Load html5-qrcode dynamically

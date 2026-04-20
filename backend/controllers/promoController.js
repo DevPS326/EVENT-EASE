@@ -1,4 +1,5 @@
 // backend/controllers/promoController.js
+const logger = require('../utils/logger');
 const DiscountCode = require('../models/DiscountCode');
 const Event        = require('../models/Event');
 
@@ -44,7 +45,7 @@ exports.validatePromo = async (req, res) => {
       finalAmount:    Math.round(discountedAmount * 100) / 100,
     });
   } catch (err) {
-    console.error('validatePromo error:', err);
+    logger.error('validatePromo error:', err);
     return sendError(res, 500, 'Server error');
   }
 };
@@ -88,7 +89,7 @@ exports.createPromo = async (req, res) => {
     return res.status(201).json({ success: true, discount });
   } catch (err) {
     if (err.code === 11000) return sendError(res, 409, 'A promo code with that name already exists');
-    console.error('createPromo error:', err);
+    logger.error('createPromo error:', err);
     return sendError(res, 500, 'Server error');
   }
 };
@@ -104,7 +105,7 @@ exports.getMyPromos = async (req, res) => {
       .lean();
     return res.status(200).json(codes);
   } catch (err) {
-    console.error('getMyPromos error:', err);
+    logger.error('getMyPromos error:', err);
     return sendError(res, 500, 'Server error');
   }
 };
@@ -123,7 +124,7 @@ exports.togglePromo = async (req, res) => {
     await discount.save();
     return res.status(200).json({ success: true, isActive: discount.isActive });
   } catch (err) {
-    console.error('togglePromo error:', err);
+    logger.error('togglePromo error:', err);
     return sendError(res, 500, 'Server error');
   }
 };

@@ -7,8 +7,15 @@
 //
 // No Razorpay SDK, no crypto, no DB calls, no business logic live here.
 
-const PaymentService = require('../services/PaymentService');
-const BookingService = require('../services/BookingService');
+const logger = require('../utils/logger');
+const PaymentService    = require('../services/PaymentService');
+const BookingService    = require('../services/BookingService');
+const RefundService     = require('../services/RefundService');
+const Ticket            = require('../models/Ticket');
+const Payment           = require('../models/Payment');
+const Event             = require('../models/Event');
+const TransactionLog    = require('../models/TransactionLog');
+const Notification      = require('../models/Notification');
 
 // Consistent error response helper
 const sendError = (res, status, message) =>
@@ -44,7 +51,7 @@ exports.createOrder = async (req, res) => {
 
     return res.status(200).json(order);
   } catch (err) {
-    console.error('createOrder error:', err);
+    logger.error('createOrder error:', err);
     return sendError(res, err.statusCode || 500, err.message || 'Server error');
   }
 };
@@ -64,12 +71,12 @@ exports.handleWebhook = async (req, res) => {
   try {
     isValid = PaymentService.verifyWebhookSignature(req.rawBody, signature);
   } catch (err) {
-    console.error('Webhook secret error:', err);
+    logger.error('Webhook secret error:', err);
     return sendError(res, 500, err.message);
   }
 
   if (!isValid) {
-    console.warn('Razorpay webhook: signature mismatch — possible spoofing attempt');
+    logger.warn('Razorpay webhook: signature mismatch — possible spoofing attempt');
     return sendError(res, 400, 'Invalid webhook signature');
   }
 
@@ -80,9 +87,90 @@ exports.handleWebhook = async (req, res) => {
     );
     return res.status(200).json({ success: true });
   } catch (err) {
-    console.error('Webhook processing error:', err);
+    logger.error('Webhook processing error:', err);
     // Always ACK 200 — Razorpay retries indefinitely on any non-2xx response
     return res.status(200).json({ success: true });
+  }
+};
+
+// ─── Refund ──────────────────────────────────────────────────────────────────
+
+// @desc    Cancel a ticket and initiate Razorpay refund
+// @route   POST /api/payments/refund
+// @access  Private
+exports.requestRefund = async (req, res) => {
+  const { ticketId } = req.body;
+  const userId = req.user?.id;
+
+  if (!ticketId) return sendError(res, 400, 'ticketId is required');
+  if (!userId)   return sendError(res, 401, 'Unauthorized');
+
+  try {
+    const ticket = await Ticket.findById(ticketId).populate('event', 'title date');
+    if (!ticket)                           return sendError(res, 404, 'Ticket not found');
+    if (ticket.user.toString() !== userId) return sendError(res, 403, 'Not authorized');
+    if (ticket.status === 'cancelled' || ticket.status === 'refunded') {
+      return sendError(res, 400, 'Ticket is already cancelled or refunded');
+    }
+
+    // Enforce refund window
+    try {
+      RefundService.assertRefundWindow(ticket.event?.date || ticket.eventDateSnapshot);
+    } catch (winErr) {
+      return sendError(res, 400, winErr.message);
+    }
+
+    // Find original payment record to get the Razorpay paymentId
+    const payment = await Payment.findOne({ event: ticket.event._id, user: userId })
+      .sort({ createdAt: -1 });
+
+    const razorpayPaymentId = payment?.paymentId || null;
+    const refundAmount      = ticket.price;
+
+    const refund = await RefundService.initiateRefund(
+      razorpayPaymentId,
+      refundAmount,
+      `Cancellation for ${ticket.event?.title || ticket.eventTitleSnapshot}`
+    );
+
+    // Update ticket status
+    ticket.status       = 'refunded';
+    ticket.refundId     = refund.id || null;
+    ticket.refundAmount = refundAmount;
+    await ticket.save();
+
+    // Log the transaction (non-blocking)
+    TransactionLog.create({
+      user:       userId,
+      event:      ticket.event._id,
+      ticket:     ticket._id,
+      type:       'refund',
+      amount:     refundAmount,
+      status:     'success',
+      gatewayRef: refund.id || null,
+    }).catch(() => {});
+
+    // In-app notification
+    Notification.create({
+      user:    userId,
+      type:    'refund_processed',
+      title:   'Refund Initiated',
+      message: refundAmount > 0
+        ? `Your refund of ₹${refundAmount} for ${ticket.event?.title || ticket.eventTitleSnapshot} has been initiated.`
+        : `Your free ticket for ${ticket.event?.title || ticket.eventTitleSnapshot} has been cancelled.`,
+      link: '/dashboard',
+    }).catch(() => {});
+
+    return res.status(200).json({
+      success: true,
+      message: refundAmount > 0 ? 'Refund initiated successfully' : 'Free ticket cancelled',
+      refundId: refund.id || null,
+      amount: refundAmount,
+    });
+
+  } catch (err) {
+    logger.error('requestRefund error:', err);
+    return sendError(res, 500, err.message || 'Server error processing refund');
   }
 };
 
@@ -127,7 +215,7 @@ exports.verifyPayment = async (req, res) => {
       });
       return res.status(200).json({ success: true, message: 'Booking Successful!', ticketIds });
     } catch (err) {
-      console.error('verifyPayment (free) error:', err);
+      logger.error('verifyPayment (free) error:', err);
       return sendError(res, 500, err.message || 'Server error');
     }
   }
@@ -185,7 +273,7 @@ exports.verifyPayment = async (req, res) => {
       ticketIds,
     });
   } catch (err) {
-    console.error('verifyPayment error:', err);
+    logger.error('verifyPayment error:', err);
     return sendError(res, 500, err.message || 'Server error');
   }
 };

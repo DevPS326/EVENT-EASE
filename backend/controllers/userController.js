@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 const User = require('../models/User');
 const Ticket = require('../models/Ticket');
 const Event = require('../models/Event');
@@ -34,7 +35,7 @@ exports.getDashboardData = async (req, res) => {
         res.status(200).json({ upcomingEvents, pastBookings });
 
     } catch (error) {
-        console.error('Error fetching dashboard data:', error);
+        logger.error('Error fetching dashboard data:', error);
         res.status(500).json({ message: "Server Error" });
     }
 };
@@ -47,7 +48,7 @@ exports.getMyProfile = async (req, res) => {
         if (!user) return res.status(404).json({ message: 'User not found' });
         res.json(user);
     } catch (error) {
-        console.error('[UserController] getMyProfile error:', error);
+        logger.error('[UserController] getMyProfile error:', error);
         res.status(500).json({ message: 'Server Error' });
     }
 };
@@ -122,7 +123,7 @@ exports.addToWishlist = async (req, res) => {
 
         res.status(200).json({ message: 'Event added to wishlist', wishlist: user.wishlist });
     } catch (error) {
-        console.error('Error adding to wishlist:', error);
+        logger.error('Error adding to wishlist:', error);
         res.status(500).json({ message: "Server Error" });
     }
 };
@@ -144,7 +145,7 @@ exports.removeFromWishlist = async (req, res) => {
 
         res.status(200).json({ message: 'Event removed from wishlist', wishlist: user.wishlist });
     } catch (error) {
-        console.error('Error removing from wishlist:', error);
+        logger.error('Error removing from wishlist:', error);
         res.status(500).json({ message: "Server Error" });
     }
 };
@@ -162,7 +163,7 @@ exports.getWishlist = async (req, res) => {
 
         res.status(200).json(user.wishlist);
     } catch (error) {
-        console.error('Error fetching wishlist:', error);
+        logger.error('Error fetching wishlist:', error);
         res.status(500).json({ message: "Server Error" });
     }
 };

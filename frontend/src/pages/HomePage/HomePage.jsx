@@ -75,14 +75,15 @@ const getDatePreset = (preset) => {
   return { startDate: '', endDate: '' };
 };
 
-const STATS = [
-  { value: '10,000+', label: 'Events Listed' },
-  { value: '500K+',   label: 'Tickets Sold' },
-  { value: '50+',     label: 'Cities' },
+const DEFAULT_STATS = [
+  { value: '—', label: 'Events Listed' },
+  { value: '—', label: 'Tickets Sold' },
+  { value: '—', label: 'Students Registered' },
 ];
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 const HomePage = () => {
+  const [platformStats, setPlatformStats] = useState(DEFAULT_STATS);
   const [searchInput, setSearchInput] = useState('');
   const [filters, setFilters] = useState({
     category: '',
@@ -97,6 +98,9 @@ const HomePage = () => {
   const [events, setEvents]       = useState([]);
   const [loading, setLoading]     = useState(true);
   const [hasSearched, setHasSearched] = useState(false);
+  const [page, setPage]           = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalEvents, setTotalEvents] = useState(0);
 
   const debouncedSearch = useDebounce(searchInput, 500);
 
@@ -119,7 +123,7 @@ const HomePage = () => {
     setLoading(true);
     setHasSearched(true);
     try {
-      const params = {};
+      const params = { page, limit: 12 };
       if (debouncedSearch)   params.search    = debouncedSearch;
       if (filters.category)  params.category  = filters.category;
       if (filters.startDate) params.startDate = filters.startDate;
@@ -130,21 +134,38 @@ const HomePage = () => {
       if (priceFilter === 'paid') { params.minPrice = 1; }
 
       const res = await client.get('/api/events', { params });
-      // Support both legacy flat-array response and current { success, count, events } contract
       const payload = res.data;
       setEvents(Array.isArray(payload) ? payload : (payload?.events || []));
+      setTotalPages(payload?.pages || 1);
+      setTotalEvents(payload?.total ?? (Array.isArray(payload) ? payload.length : (payload?.events?.length || 0)));
     } catch (err) {
-      console.error('[HomePage] fetchEvents error:', err.response?.data || err.message);
-      toast.error(err.response?.data?.message || 'Failed to load events.');
+      toast.error(err.response?.data?.message || 'Failed to load events.', { id: 'events-load-error' });
       setEvents([]);
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, filters, priceFilter]);
+  }, [debouncedSearch, filters, priceFilter, page]);
 
   useEffect(() => {
     fetchEvents();
   }, [fetchEvents]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, filters, priceFilter]);
+
+  useEffect(() => {
+    client.get('/api/stats/platform').then(({ data }) => {
+      if (data.success) {
+        setPlatformStats([
+          { value: data.totalEvents.toLocaleString(),       label: 'Events Listed' },
+          { value: data.totalTicketsSold.toLocaleString(),  label: 'Tickets Sold' },
+          { value: data.totalUsers.toLocaleString(),        label: 'Students Registered' },
+        ]);
+      }
+    }).catch(() => {}); // silently fallback to defaults
+  }, []);
 
   const clearFilters = () => {
     setSearchInput('');
@@ -241,7 +262,7 @@ const HomePage = () => {
             variants={heroItem}
             className="mt-12 flex flex-wrap justify-center gap-4"
           >
-            {STATS.map((stat, i) => (
+            {platformStats.map((stat, i) => (
               <div
                 key={i}
                 className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm"
@@ -416,9 +437,9 @@ const HomePage = () => {
           <h2 className="text-2xl font-bold text-white">
             {hasActiveFilters ? 'Search Results' : 'Upcoming Events'}
           </h2>
-          {!loading && events.length > 0 && (
+          {!loading && totalEvents > 0 && (
             <span className="text-sm text-slate-400">
-              {events.length} event{events.length !== 1 ? 's' : ''} found
+              {totalEvents} event{totalEvents !== 1 ? 's' : ''} found
             </span>
           )}
         </div>
@@ -440,6 +461,52 @@ const HomePage = () => {
               <EventCard key={event._id} event={event} />
             ))}
           </motion.div>
+        )}
+
+        {/* Pagination bar */}
+        {!loading && totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 mt-12">
+            <button
+              onClick={() => { setPage((p) => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              disabled={page === 1}
+              className="px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-sm font-medium hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              ← Prev
+            </button>
+
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+              .reduce((acc, p, idx, arr) => {
+                if (idx > 0 && p - arr[idx - 1] > 1) acc.push('…');
+                acc.push(p);
+                return acc;
+              }, [])
+              .map((p, i) =>
+                p === '…' ? (
+                  <span key={`ellipsis-${i}`} className="px-2 text-slate-500">…</span>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                    className={`w-9 h-9 rounded-lg text-sm font-semibold transition-colors ${
+                      page === p
+                        ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/25'
+                        : 'bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+
+            <button
+              onClick={() => { setPage((p) => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              disabled={page === totalPages}
+              className="px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-sm font-medium hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Next →
+            </button>
+          </div>
         )}
       </div>
     </div>

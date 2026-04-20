@@ -1,13 +1,17 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, Ticket, Clock, Megaphone, CheckCheck, X } from 'lucide-react';
+import { Bell, Ticket, Clock, Megaphone, CheckCheck, X, RefreshCw, AlertCircle, Ban } from 'lucide-react';
 import client from '../../api/client';
 
 const TYPE_META = {
   booking_confirmed: { Icon: Ticket,    color: 'text-emerald-400', bg: 'bg-emerald-500/15' },
   waitlist_spot:     { Icon: Clock,     color: 'text-amber-400',   bg: 'bg-amber-500/15'   },
-  event_update:      { Icon: Megaphone, color: 'text-violet-400',  bg: 'bg-violet-500/15'  },
+  event_update:      { Icon: Megaphone,    color: 'text-violet-400',  bg: 'bg-violet-500/15'  },
+  event_reminder:    { Icon: Clock,        color: 'text-sky-400',     bg: 'bg-sky-500/15'     },
+  refund_processed:  { Icon: RefreshCw,    color: 'text-teal-400',    bg: 'bg-teal-500/15'    },
+  event_cancelled:   { Icon: Ban,          color: 'text-red-400',     bg: 'bg-red-500/15'     },
+  payment_failed:    { Icon: AlertCircle,  color: 'text-orange-400',  bg: 'bg-orange-500/15'  },
 };
 
 const POLL_INTERVAL = 60_000; // 60 s

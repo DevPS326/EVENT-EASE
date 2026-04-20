@@ -351,7 +351,7 @@ const EventDetails = () => {
           toast.success('Booking confirmed! Your free ticket is ready.');
           navigate('/my-tickets');
         } catch (freeErr) {
-          toast.error(freeErr.response?.data?.message || 'Booking failed. Please try again.');
+          toast.error(freeErr.response?.data?.message || 'Booking failed. Please try again.', { id: 'booking-error' });
           setPaymentLoading(false);
         }
         return;
@@ -410,7 +410,7 @@ const EventDetails = () => {
       });
       rzp.open();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Could not initiate payment. Please try again.');
+      toast.error(err.response?.data?.message || 'Could not initiate payment. Please try again.', { id: 'booking-error' });
       setPaymentLoading(false);
     }
   };

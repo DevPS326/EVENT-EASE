@@ -3,6 +3,7 @@
 // Owns all Razorpay SDK interactions, HMAC signature logic (both client-flow
 // and webhook), and webhook event processing.  Nothing HTTP-specific lives here.
 
+const logger = require('../utils/logger');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
@@ -94,7 +95,11 @@ const verifyPaymentSignature = (orderId, paymentId, signature) => {
     .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
     .update(`${orderId}|${paymentId}`)
     .digest('hex');
-  return expected === signature;
+  try {
+    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+  } catch {
+    return false; // length mismatch → invalid signature
+  }
 };
 
 /**
@@ -158,6 +163,27 @@ const processWebhookEvent = async (eventType, payload) => {
         event: new mongoose.Types.ObjectId(), // placeholder — reconcile later
         amount: amount / 100,   // paise → INR
       });
+    }
+  }
+
+  if (eventType === 'payment.failed') {
+    const entity = payload.payment?.entity;
+    if (!entity) return;
+
+    const { order_id: orderId } = entity;
+
+    // Notify the user if we can identify them from a prior payment record
+    const existingPayment = await Payment.findOne({ orderId });
+    if (existingPayment) {
+      const Notification = require('../models/Notification');
+      Notification.create({
+        user:    existingPayment.user,
+        type:    'payment_failed',
+        title:   'Payment Failed',
+        message: `Your payment for order ${orderId} could not be processed. Please try booking again.`,
+        link:    '/',
+      }).catch(() => {});
+      logger.warn(`[Webhook] payment.failed for orderId: ${orderId}`);
     }
   }
 };

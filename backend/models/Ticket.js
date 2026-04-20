@@ -17,7 +17,13 @@ const TicketSchema = new mongoose.Schema({
 
     ticketId: { type: String, unique: true },
     qrCode: { type: String },
-    status: { type: String, enum: ['booked', 'cancelled', 'checked-in'], default: 'booked' },
+    status: {
+        type: String,
+        enum: ['pending', 'booked', 'confirmed', 'cancelled', 'checked-in', 'attended', 'refunded'],
+        default: 'booked',
+    },
+    refundId: { type: String },
+    refundAmount: { type: Number },
     checkedInAt: { type: Date },
 }, { timestamps: true });
 

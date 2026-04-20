@@ -20,6 +20,7 @@
 //   - Claiming BEFORE sending is intentional: a missed reminder (recoverable)
 //     is safer than spamming all attendees with duplicate emails.
 
+const logger = require('./logger');
 const cron = require('node-cron');
 const Event = require('../models/Event');
 const Ticket = require('../models/Ticket');
@@ -28,7 +29,7 @@ const { sendEmail } = require('./emailService');
 const startScheduler = () => {
     // Run every 15 minutes (10:00, 10:15, 10:30 …)
     cron.schedule('*/15 * * * *', async () => {
-        console.log('Running Event Reminder Scheduler...');
+        logger.info('Running Event Reminder Scheduler...');
 
         const now = new Date();
         // 2-hour lookahead window — wider than the 15-min tick interval so
@@ -58,7 +59,7 @@ const startScheduler = () => {
                 if (!event) break;
 
                 processed++;
-                console.log(`Claimed reminder lock for: "${event.title}"`);
+                logger.info(`Claimed reminder lock for: "${event.title}"`);
 
                 // ── Derive unique attendees from Ticket collection ──────────
                 // Event.attendees array was removed (Phase 2) to prevent the
@@ -86,19 +87,19 @@ const startScheduler = () => {
                         <p>Team EventEase</p>
                     `;
                     return sendEmail(user.email, subject, htmlContent)
-                        .catch(err => console.error(`Failed to email ${user.email}:`, err.message));
+                        .catch(err => logger.error(`Failed to email ${user.email}:`, err.message));
                 });
 
                 await Promise.all(emailPromises);
-                console.log(`Reminders sent for: "${event.title}" (${uniqueUsers.length} recipient(s))`);
+                logger.info(`Reminders sent for: "${event.title}" (${uniqueUsers.length} recipient(s))`);
             }
 
             if (processed > 0) {
-                console.log(`Scheduler run complete: processed ${processed} event(s).`);
+                logger.info(`Scheduler run complete: processed ${processed} event(s).`);
             }
 
         } catch (error) {
-            console.error('Error in scheduler:', error);
+            logger.error('Error in scheduler:', error);
         }
     });
 };

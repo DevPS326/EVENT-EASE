@@ -5,6 +5,7 @@
 //   getEventReviews — paginated list + rating summary; marks caller's own review
 //   deleteReview  — owner-only delete
 
+const logger = require('../utils/logger');
 const Review = require('../models/Review');
 const Event  = require('../models/Event');
 const Ticket = require('../models/Ticket');
@@ -83,7 +84,7 @@ exports.createReview = async (req, res) => {
 
     return res.status(200).json({ success: true, review, ...summary });
   } catch (err) {
-    console.error('createReview error:', err);
+    logger.error('createReview error:', err);
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
@@ -128,7 +129,7 @@ exports.getEventReviews = async (req, res) => {
       ...summary,
     });
   } catch (err) {
-    console.error('getEventReviews error:', err);
+    logger.error('getEventReviews error:', err);
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
@@ -150,7 +151,7 @@ exports.deleteReview = async (req, res) => {
     await review.deleteOne();
     return res.status(200).json({ success: true, message: 'Review deleted' });
   } catch (err) {
-    console.error('deleteReview error:', err);
+    logger.error('deleteReview error:', err);
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };

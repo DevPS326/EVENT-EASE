@@ -7,7 +7,15 @@ const notificationSchema = new Schema(
     user:    { type: Schema.Types.ObjectId, ref: 'User', required: true },
     type:    {
       type:     String,
-      enum:     ['booking_confirmed', 'waitlist_spot', 'event_update'],
+      enum:     [
+        'booking_confirmed',
+        'waitlist_spot',
+        'event_update',
+        'event_reminder',
+        'refund_processed',
+        'event_cancelled',
+        'payment_failed',
+      ],
       required: true,
     },
     title:   { type: String, required: true, maxlength: 120 },

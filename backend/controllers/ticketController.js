@@ -1,4 +1,6 @@
+const logger = require('../utils/logger');
 const mongoose = require('mongoose');
+const crypto   = require('crypto');
 const Ticket       = require('../models/Ticket');
 const Event        = require('../models/Event');
 const User         = require('../models/User');
@@ -13,11 +15,28 @@ const { sendEmail } = require('../utils/emailService');
  */
 exports.checkInTicket = async (req, res) => {
   const { ticketId } = req.params;
+  const { qrRaw }    = req.body; // optional: raw QR JSON string for HMAC verification
 
   try {
-    const ticket = await Ticket.findOne({ ticketId }).populate('event', 'organizer title');
+    // ── Optional HMAC signature verification ─────────────────────────────
+    if (qrRaw) {
+      try {
+        const parsed = JSON.parse(qrRaw);
+        if (parsed.p && parsed.s) {
+          const secret   = process.env.QR_SECRET || process.env.JWT_SECRET;
+          const expected = crypto.createHmac('sha256', secret).update(parsed.p).digest('hex');
+          if (!crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(parsed.s))) {
+            return res.status(400).json({ success: false, code: 'invalid_token', message: 'QR signature invalid' });
+          }
+        }
+      } catch {
+        return res.status(400).json({ success: false, code: 'invalid_token', message: 'Malformed QR data' });
+      }
+    }
+
+    const ticket = await Ticket.findOne({ ticketId }).populate('event', 'organizer title date');
     if (!ticket) {
-      return res.status(404).json({ success: false, message: 'Ticket not found' });
+      return res.status(404).json({ success: false, code: 'not_found', message: 'Ticket not found' });
     }
 
     // Verify the calling organizer owns this event
@@ -26,7 +45,20 @@ exports.checkInTicket = async (req, res) => {
       return res.status(403).json({ success: false, message: 'You do not manage this event' });
     }
 
-    if (ticket.status === 'checked-in') {
+    // ── Timestamp validation ──────────────────────────────────────────────
+    const eventDate = ticket.event?.date || ticket.eventDateSnapshot;
+    if (eventDate) {
+      const now        = Date.now();
+      const eventTime  = new Date(eventDate).getTime();
+      if (now < eventTime - 2 * 60 * 60 * 1000) { // more than 2h before event
+        return res.status(400).json({ success: false, code: 'too_early', message: 'Check-in opens 2 hours before the event' });
+      }
+      if (now > eventTime + 6 * 60 * 60 * 1000) { // more than 6h after event
+        return res.status(400).json({ success: false, code: 'expired', message: 'Event has ended — check-in window closed' });
+      }
+    }
+
+    if (ticket.status === 'checked-in' || ticket.status === 'attended') {
       return res.status(200).json({
         success: true,
         alreadyCheckedIn: true,
@@ -39,11 +71,11 @@ exports.checkInTicket = async (req, res) => {
       });
     }
 
-    if (ticket.status === 'cancelled') {
-      return res.status(400).json({ success: false, message: 'Ticket has been cancelled' });
+    if (ticket.status === 'cancelled' || ticket.status === 'refunded') {
+      return res.status(400).json({ success: false, code: 'cancelled', message: `Ticket has been ${ticket.status}` });
     }
 
-    ticket.status = 'checked-in';
+    ticket.status = 'attended';
     ticket.checkedInAt = new Date();
     await ticket.save();
 
@@ -58,7 +90,7 @@ exports.checkInTicket = async (req, res) => {
       },
     });
   } catch (err) {
-    console.error('checkInTicket error:', err);
+    logger.error('checkInTicket error:', err);
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
@@ -114,7 +146,7 @@ exports.getMyTickets = async (req, res) => {
 
     return res.status(200).json({ upcomingEvents, pastBookings });
   } catch (err) {
-    console.error('Error fetching user tickets:', err);
+    logger.error('Error fetching user tickets:', err);
     return res.status(500).json({ message: 'Server Error' });
   }
 };
@@ -210,7 +242,7 @@ exports.cancelTicket = async (req, res) => {
 
       // It's acceptable if matchedCount === 0 (event or ticketType removed). We just log:
       if (eventUpdateResult.matchedCount === 0) {
-        console.warn(`Event or ticketType missing when cancelling ticket ${id}. eventId=${eventId}, ticketTypeId=${ticketTypeId}`);
+        logger.warn(`Event or ticketType missing when cancelling ticket ${id}. eventId=${eventId}, ticketTypeId=${ticketTypeId}`);
         // No throw — we still remove ticket and user's purchased reference.
       }
 
@@ -222,7 +254,7 @@ exports.cancelTicket = async (req, res) => {
 
       // userUpdateResult.nModified may be 0 if user didn't have the ticket reference; that's okay but log
       if (userUpdateResult.matchedCount === 0) {
-        console.warn(`User not found while removing purchasedTickets entry for user ${req.user.id}`);
+        logger.warn(`User not found while removing purchasedTickets entry for user ${req.user.id}`);
       }
 
       // All operations succeeded within transaction block
@@ -239,13 +271,13 @@ exports.cancelTicket = async (req, res) => {
 
   } catch (err) {
     // If we threw structured error, use it; otherwise 500
-    console.error('Error cancelling ticket:', err);
+    logger.error('Error cancelling ticket:', err);
 
     // Attempt abort if session still in transaction (withTransaction auto-aborts on exception, but safe)
     try {
       if (session.inTransaction()) await session.abortTransaction();
     } catch (e) {
-      console.error('Error aborting transaction:', e);
+      logger.error('Error aborting transaction:', e);
     }
 
     const status = (err && err.status) ? err.status : 500;

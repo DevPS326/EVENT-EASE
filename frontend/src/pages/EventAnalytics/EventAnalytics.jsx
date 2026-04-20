@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, Tooltip as PieTooltip,
+  LineChart, Line, Area, AreaChart,
 } from 'recharts';
 import toast from 'react-hot-toast';
 import client from '../../api/client';
@@ -20,7 +21,7 @@ const EventAnalytics = () => {
       const res = await client.get(`/api/events/${id}/analytics`);
       setStats(res.data);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to load analytics.');
+      toast.error(err.response?.data?.message || 'Failed to load analytics.', { id: 'analytics-load' });
     } finally {
       setLoading(false);
     }
@@ -216,6 +217,33 @@ const EventAnalytics = () => {
                 </ResponsiveContainer>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── Daily Sales Trend ──────────────────────────────────────── */}
+        {stats.dailySales && stats.dailySales.length > 1 && (
+          <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 mb-8">
+            <h3 className="text-base font-bold text-white mb-5">Daily Sales Trend</h3>
+            <ResponsiveContainer width="100%" height={220}>
+              <AreaChart data={stats.dailySales} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                <defs>
+                  <linearGradient id="gradRevenue" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor="#7c3aed" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#7c3aed" stopOpacity={0}   />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8, fontSize: 13 }}
+                  labelStyle={{ color: '#e2e8f0' }}
+                  formatter={(v, name) => [name === 'revenue' ? `₹${v}` : v, name === 'revenue' ? 'Revenue' : 'Tickets']}
+                />
+                <Area type="monotone" dataKey="revenue" stroke="#7c3aed" fill="url(#gradRevenue)" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="count" stroke="#a855f7" strokeWidth={2} dot={{ r: 3, fill: '#a855f7' }} />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         )}
 

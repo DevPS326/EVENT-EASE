@@ -1,4 +1,5 @@
 // backend/controllers/authController.js
+const logger = require('../utils/logger');
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
@@ -9,14 +10,14 @@ const { sendEmail } = require('../utils/emailService');
 const generateToken = (user) => {
     const secret = process.env.JWT_SECRET;
     if (!secret) {
-        console.error('[AUTH] JWT_SECRET is not set in environment variables!');
+        logger.error('[AUTH] JWT_SECRET is not set in environment variables!');
     }
     try {
         return jwt.sign({ id: user._id, role: user.role }, secret || 'local-dev-fallback-secret', {
             expiresIn: '30d',
         });
     } catch (err) {
-        console.error('[AUTH] jwt.sign failed:', err.message);
+        logger.error('[AUTH] jwt.sign failed:', err.message);
         throw err;
     }
 };
@@ -26,7 +27,7 @@ const verifyRecaptcha = async (token) => {
     // Bypass for any non-production environment (development, test, unset, etc.)
     // This also guards against empty/null/undefined tokens which would always fail.
     if (!token || process.env.NODE_ENV !== 'production') {
-        console.log('[reCAPTCHA] Bypassing verification (NODE_ENV=' + process.env.NODE_ENV + ')');
+        logger.info('[reCAPTCHA] Bypassing verification (NODE_ENV=' + process.env.NODE_ENV + ')');
         return true;
     }
     const secretKey = process.env.RECAPTCHA_SECRET_KEY;
@@ -89,7 +90,7 @@ exports.signup = async (req, res) => {
             res.status(400).json({ message: 'Invalid user data' });
         }
     } catch (error) {
-        console.error('[AUTH CRASH] signup:', error);
+        logger.error('[AUTH CRASH] signup:', error);
         res.status(500).json({ message: 'Server Error: ' + error.message });
     }
 };
@@ -151,7 +152,7 @@ exports.login = async (req, res) => {
             res.status(401).json({ message: 'Invalid email or password' });
         }
     } catch (error) {
-        console.error('[AUTH CRASH] login:', error);
+        logger.error('[AUTH CRASH] login:', error);
         res.status(500).json({ message: 'Server Error: ' + error.message });
     }
 };
@@ -191,7 +192,7 @@ exports.verify2FA = async (req, res) => {
             token: generateToken(user),
         });
     } catch (error) {
-        console.error('[AUTH CRASH] verify2FA:', error);
+        logger.error('[AUTH CRASH] verify2FA:', error);
         res.status(500).json({ message: 'Server Error: ' + error.message });
     }
 };
@@ -204,31 +205,33 @@ exports.googleCallback = async (req, res) => {
         // req.user is populated by Passport after successful Google authentication
         const profile = req.user;
 
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
         if (!profile) {
-            console.log('[googleCallback] ERROR: req.user is undefined — Passport did not populate the profile.');
-            return res.redirect('http://localhost:5173/login?error=auth_failed');
+            logger.info('[googleCallback] ERROR: req.user is undefined — Passport did not populate the profile.');
+            return res.redirect(`${frontendUrl}/login?error=auth_failed`);
         }
 
         const email    = (profile.emails?.[0]?.value || '').trim().toLowerCase();
         const name     = profile.displayName;
         const googleId = profile.id;
 
-        console.log('[googleCallback] Google profile received:', { email, name, googleId });
+        logger.info('[googleCallback] Google profile received:', { email, name, googleId });
 
         if (!email) {
-            console.log('[googleCallback] ERROR: No email returned from Google profile.');
-            return res.redirect('http://localhost:5173/login?error=auth_failed');
+            logger.info('[googleCallback] ERROR: No email returned from Google profile.');
+            return res.redirect(`${frontendUrl}/login?error=auth_failed`);
         }
 
         // IIT ISM domain restriction for Google OAuth
         if (!email.endsWith('@iitism.ac.in')) {
-            console.log('[googleCallback] Blocked non-IIT email via Google OAuth:', email);
-            return res.redirect('http://localhost:5173/login?error=restricted_domain');
+            logger.info('[googleCallback] Blocked non-IIT email via Google OAuth:', email);
+            return res.redirect(`${frontendUrl}/login?error=restricted_domain`);
         }
 
         // Check if user exists in DB
         let user = await User.findOne({ email });
-        console.log('[googleCallback] DB lookup result:', user ? `found user ${user._id}` : 'new user — will create');
+        logger.info('[googleCallback] DB lookup result:', user ? `found user ${user._id}` : 'new user — will create');
 
         if (user) {
             // Link googleId if not already present
@@ -244,21 +247,21 @@ exports.googleCallback = async (req, res) => {
                 googleId,
                 role: 'user',
             });
-            console.log('[googleCallback] New user created:', user._id);
+            logger.info('[googleCallback] New user created:', user._id);
         }
 
         // Generate token using the Database User object (contains _id and role)
         const token = generateToken(user);
-        console.log('[googleCallback] Token generated — redirecting to frontend callback route.');
+        logger.info('[googleCallback] Token generated — redirecting to frontend callback route.');
 
         // Redirect to frontend OAuth landing page
-        res.redirect('http://localhost:5173/auth/google/callback?token=' + token);
+        res.redirect(`${process.env.FRONTEND_URL}/auth/google/callback?token=${token}`);
 
     } catch (error) {
-        console.log('[googleCallback] UNHANDLED ERROR:');
-        console.log('  message :', error.message);
-        console.log('  stack   :', error.stack);
-        console.log('  req.user:', req.user);
-        res.redirect('http://localhost:5173/login?error=auth_failed');
+        logger.info('[googleCallback] UNHANDLED ERROR:');
+        logger.info('  message :', error.message);
+        logger.info('  stack   :', error.stack);
+        logger.info('  req.user:', req.user);
+        res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=auth_failed`);
     }
 };

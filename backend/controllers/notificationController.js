@@ -1,4 +1,5 @@
 // backend/controllers/notificationController.js
+const logger = require('../utils/logger');
 const Notification = require('../models/Notification');
 
 // ─── Get notifications ────────────────────────────────────────────────────────
@@ -23,7 +24,7 @@ exports.getNotifications = async (req, res) => {
 
     return res.status(200).json({ success: true, notifications, unreadCount });
   } catch (err) {
-    console.error('getNotifications error:', err);
+    logger.error('getNotifications error:', err);
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
@@ -45,7 +46,7 @@ exports.markRead = async (req, res) => {
     if (!notif) return res.status(404).json({ success: false, message: 'Not found' });
     return res.status(200).json({ success: true, notification: notif });
   } catch (err) {
-    console.error('markRead error:', err);
+    logger.error('markRead error:', err);
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
@@ -65,7 +66,7 @@ exports.markAllRead = async (req, res) => {
     );
     return res.status(200).json({ success: true });
   } catch (err) {
-    console.error('markAllRead error:', err);
+    logger.error('markAllRead error:', err);
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };

@@ -1,9 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/authMiddleware');
-const { getDashboardData, addToWishlist, removeFromWishlist, getWishlist, getUserProfile, updateUserProfile, getMyProfile } = require('../controllers/userController');
+const { addToWishlist, removeFromWishlist, getWishlist, getUserProfile, updateUserProfile, getMyProfile } = require('../controllers/userController');
 
-router.route('/dashboard').get(protect, getDashboardData);
 // Self-profile — authenticated user's own data without knowing their _id
 router.route('/profile').get(protect, getMyProfile);
 router.route('/wishlist').get(protect, getWishlist);

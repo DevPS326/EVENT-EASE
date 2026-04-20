@@ -35,7 +35,7 @@ const ManagePromoCodes = () => {
         setCodes(promoRes.data.codes || promoRes.data || []);
         setEvents(eventsRes.data || []);
       } catch {
-        toast.error('Failed to load promo codes.');
+        toast.error('Failed to load promo codes.', { id: 'promo-load' });
       } finally {
         setLoading(false);
       }
