@@ -112,6 +112,7 @@ const EventDetails = () => {
                                 razorpay_signature: response.razorpay_signature,
                                 eventId: event._id,
                                 ticketTypeId: selectedTicketType._id,
+                                quantity,
                                 amount: totalAmount,
                             }),
                         });
