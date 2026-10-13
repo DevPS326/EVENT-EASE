@@ -4,37 +4,52 @@ const cors = require('cors');
 const passport = require('passport');
 const connectDB = require('./config/db');
 const startScheduler = require('./utils/scheduler');
+const Payment = require('./models/Payment');
 
-// Load environment variables - MUST BE AT THE TOP
 dotenv.config();
-
-require('./config/passport'); // Import Passport configuration
-
-// Connect to the database
-connectDB();
-
-// Start the scheduler
-startScheduler();
+require('./config/passport');
 
 const app = express();
+app.use(express.json());
+app.use(cors());
+app.use(passport.initialize());
 
-// Use Middlewares
-app.use(express.json()); // To parse JSON data
-app.use(cors()); // To enable Cross-Origin Resource Sharing
-app.use(passport.initialize()); // Initialize Passport
-
-// Define API Routes
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/events', require('./routes/eventRoutes'));
 app.use('/api/payments', require('./routes/paymentRoutes'));
 app.use('/api/tickets', require('./routes/ticketRoutes'));
-app.use('/api/users', require('./routes/userRoutes')); // To fetch user data (required for Dashboard)
+app.use('/api/users', require('./routes/userRoutes'));
 
-// A simple test route
 app.get('/', (req, res) => {
-    res.send('EventEase Backend API is running...');
+  res.send('EventEase Backend API is running...');
 });
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => console.log(`Server is running in ${process.env.NODE_ENV} mode on port ${PORT}`));
+async function start() {
+  try {
+    await connectDB();
+
+    // Fail closed: without BOTH unique indexes, concurrent payment requests
+    // could create duplicate tickets. Existing duplicate rows must be reviewed
+    // and reconciled before these indexes can be created.
+    await Payment.collection.createIndex(
+      { orderId: 1 },
+      { unique: true, name: 'uniq_razorpay_order' }
+    );
+    await Payment.collection.createIndex(
+      { paymentId: 1 },
+      { unique: true, name: 'uniq_razorpay_payment' }
+    );
+
+    startScheduler();
+    app.listen(PORT, () => {
+      console.log('Server is running in ' + process.env.NODE_ENV + ' mode on port ' + PORT);
+    });
+  } catch (error) {
+    console.error('Startup blocked: database/payment indexes unavailable:', error);
+    process.exit(1);
+  }
+}
+
+start();
